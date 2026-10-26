@@ -6,6 +6,8 @@ E3 how much pre-clearance is enough?         share 0..100%, all8 vs mip
 E4 does it survive wrong inputs?             spreads x0.5 / x2, lateness x0.5 / x2, TMH lab
 E5 bottlenecks: which fix buys the most?     +nurses, +chairs, +hood, +doctor, +desk, pre-compounding, pharmacy cap
 E6 capacity (Presentation 1 problem):        chairs x nurses grid, cost subject to a P90-wait limit
+E7 arrival smoothing (constraint C7):        E5 fixes and the E6 grid again, with told arrivals capped
+                                             at what the desks and doctors can serve
 
 Every scenario runs on the same seeded days. Results land in results/*.csv.
 Usage: python 05_experiments.py [E1 E2 ...]   (default: all)
@@ -21,7 +23,7 @@ from chemo.runner import Scenario, run, summarise
 
 DAYS = 100
 base_d, base_u = DataConfig(), Unit()
-todo = sys.argv[1:] or ["E1", "E2", "E3", "E4", "E5", "E6"]
+todo = sys.argv[1:] or ["E1", "E2", "E3", "E4", "E5", "E6", "E7"]
 
 
 def go(tag, scenarios, days=DAYS):
@@ -84,3 +86,14 @@ if "E6" in todo:
     sc = [Scenario(f"K={k} N={n}", unit=replace(base_u, chairs=k, nurses=n))
           for k in [16, 20, 24] for n in [6, 8, 10, 12]]
     go("E6_capacity", sc, days=40)
+
+if "E7" in todo:
+    sc = [Scenario("C7 | base", arrival_cap=True),
+          Scenario("C7 | pre-clear 60%", data=replace(base_d, p_precleared=0.6), arrival_cap=True),
+          Scenario("C7 | pre-clear 60% + pre-compound", data=replace(base_d, p_precleared=0.6),
+                   unit=replace(base_u, precompound_precleared=True), arrival_cap=True),
+          Scenario("C7 | +1 registration desk", unit=replace(base_u, registration_desks=3), arrival_cap=True),
+          Scenario("C7 | +1 doctor", unit=replace(base_u, doctors=3), arrival_cap=True)]
+    sc += [Scenario(f"C7 | K={k} N={n}", unit=replace(base_u, chairs=k, nurses=n), arrival_cap=True)
+           for k in [16, 20, 24] for n in [6, 8, 10, 12]]
+    go("E7_arrival_cap", sc, days=40)

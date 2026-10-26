@@ -31,8 +31,10 @@ def hbar(ax, labels, vals, ci, color, unit, highlight=None):
     ax.barh(y, vals, xerr=ci, color=cols, height=0.6, error_kw=dict(ecolor=INK2, lw=1, capsize=3))
     ax.set_yticks(y, labels)
     ax.grid(axis="y", visible=False)
-    for yi, v in zip(y, vals):
-        ax.text(v, yi + 0.36, f"{v:.0f} {unit}", color=INK, fontsize=9, va="bottom", ha="right")
+    ci = np.zeros(len(vals)) if ci is None else np.nan_to_num(np.asarray(ci, float))
+    for yi, v, c in zip(y, vals, ci):
+        ax.text(v + c + max(vals) * 0.02, yi, f"{v:.0f}", color=INK, fontsize=9, va="center", ha="left")
+    ax.set_xlim(0, max(vals) * 1.15)
 
 
 def fig_e1():
@@ -94,7 +96,7 @@ def fig_e4():
         ax.set_yticks(y, cases)
         ax.grid(axis="y", visible=False)
         ax.set_title(t)
-    axs[0].legend(loc="lower right")
+    axs[0].legend(loc="upper center", bbox_to_anchor=(1.1, -0.1), ncol=2)
     fig.suptitle("E4  Inputs wrong? The plan was made with the base inputs; reality differs",
                  x=0.01, y=1.06, ha="left", fontsize=12, fontweight="bold")
     fig.savefig(OUT + "E4_robust.png")

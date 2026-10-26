@@ -42,7 +42,7 @@ class WarmHiGHS(pulp.HiGHS):
 
 
 def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_makespan=None,
-                   w_overtime=None, pharmacy_cap=False, time_limit=60, gap=0.0, msg=False, n_starts=40):
+                   w_overtime=None, pharmacy_cap=False, arrival_cap=False, time_limit=60, gap=0.0, msg=False, n_starts=40):
     M, U, K = unit.monitor_ratio, unit.nurse_units, unit.chairs
     T = (unit.close - unit.open + horizon_extra) // SLOT
     T_close = (unit.close - unit.open) // SLOT
@@ -93,6 +93,19 @@ def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_m
             starts = [y[g, t] for g in groups for t in feas[g] if tau <= t < tau + win]
             if starts:
                 prob += pulp.lpSum(starts) <= cap
+
+    if arrival_cap:                                                            # (7) arrival smoothing
+        # told arrival slot = chair slot - buffer = t - r_g. Cap arrivals per 15 min at what the
+        # registration desks (everyone) and the doctors (same-day patients only) can serve.
+        cap_all = math.floor(unit.registration_desks * SLOT / STAGES["registration"].mean)
+        cap_s = math.floor(unit.doctors * SLOT / STAGES["doctor"].mean)
+        for a in range(T):
+            told_all = [y[g, t] for g in groups for t in feas[g] if t - r[g] == a]
+            told_s = [y[g, t] for g in groups for t in feas[g] if t - r[g] == a and g[0] == "S"]
+            if told_all:
+                prob += pulp.lpSum(told_all) <= cap_all
+            if told_s:
+                prob += pulp.lpSum(told_s) <= cap_s
 
     # MIP start: best of several greedy list schedules (longest-first within release, plus random tie-breaks)
     def score(sched):

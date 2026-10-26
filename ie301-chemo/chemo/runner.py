@@ -33,6 +33,7 @@ class Scenario:
     data_unit: Unit = field(default_factory=Unit)   # unit used to size the patient list (fixed demand)
     buffer_cfg: DataConfig = field(default_factory=DataConfig)  # what the planner believes (robustness tests)
     pharmacy_cap: bool = False
+    arrival_cap: bool = False
 
 
 def _schedule(day_df, sc: Scenario, B):
@@ -41,7 +42,8 @@ def _schedule(day_df, sc: Scenario, B):
     u = sc.unit
     key = dict(day=int(day_df.day.iloc[0]), seed=sc.data.seed, share=sc.data.p_precleared, B=B, K=u.chairs, N=u.nurses,
                M=u.monitor_ratio, H=u.pharmacy_hoods if sc.pharmacy_cap else 0, cap=sc.pharmacy_cap,
-               load=sc.data_unit.load, unfit=sc.data.p_unfit)
+               load=sc.data_unit.load, unfit=sc.data.p_unfit,
+               **({"arr": True, "D": u.registration_desks, "Dr": u.doctors} if sc.arrival_cap else {}))
     h = hashlib.md5(json.dumps(key, sort_keys=True).encode()).hexdigest()[:16]
     path = os.path.join(CACHE, f"{h}.csv")
     pats = day_df[~day_df.deferred_prior_day]
@@ -50,7 +52,8 @@ def _schedule(day_df, sc: Scenario, B):
         out = pats.copy()
         out["slot"] = s.slot.reindex(out.pid.values).to_numpy()
     else:
-        out = book(day_df, "mip", u, buffers=B, mip_kwargs={**MIP_ARGS, "pharmacy_cap": sc.pharmacy_cap})
+        out = book(day_df, "mip", u, buffers=B, mip_kwargs={**MIP_ARGS, "pharmacy_cap": sc.pharmacy_cap,
+                                                                 "arrival_cap": sc.arrival_cap})
         os.makedirs(CACHE, exist_ok=True)
         out.set_index("pid")[["slot"]].to_csv(path)
     out["told"] = out.slot - out.cls.map(B)
