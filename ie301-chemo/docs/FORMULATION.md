@@ -111,9 +111,12 @@ $$
 &(3)\ \text{nurses (Hesaraki)} && \textstyle\sum_{g}\sum_{t:\,t\le\tau<t+L_g} \omega_{g,\tau-t}\,y_{g,t} \le M N && \forall \tau\\
 &(4)\ \text{open is a prefix} && z_\tau \ge z_{\tau+1} && \forall \tau\\
 &(5)\ \text{release (buffer rule)} && y_{g,t} = 0 \ \text{ for } t < r_g\\
-&(6)\ \text{pharmacy smoothing (optional)} && \textstyle\sum_{g}\sum_{t=\tau}^{\tau+1} y_{g,t} \le \Big\lfloor \tfrac{H \cdot 30}{\bar p} \Big\rfloor && \forall \tau
+&(6)\ \text{pharmacy smoothing (optional)} && \textstyle\sum_{g}\sum_{t=\tau}^{\tau+1} y_{g,t} \le \Big\lfloor \tfrac{H \cdot 30}{\bar p} \Big\rfloor && \forall \tau\\
+&(7)\ \text{arrival smoothing (optional)} && \textstyle\sum_{g} y_{g,a+r_g} \le \big\lfloor \tfrac{D \cdot 15}{\overline{reg}} \big\rfloor,\ \sum_{g \in S} y_{g,a+r_g} \le \big\lfloor \tfrac{Dr \cdot 15}{\overline{doc}} \big\rfloor && \forall a
 \end{aligned}
 $$
+
+Constraint (7) was added after E5. Without it, extra nurses let the MIP tell many patients to arrive at the same time, and the queue moved to registration and the doctors. $a$ is the told-arrival slot $t - r_g$; $D$ and $Dr$ are desks and doctors. E7 shows that with (7), 10 nurses cut overtime instead of raising it.
 
 Weights: $w_m = n/4$ and $w_o = 10n$ (Hesaraki's flowtime/makespan balance, plus a heavy overtime penalty). In (6), $H$ is the number of pharmacy hoods and $\bar p$ the mean preparation time.
 

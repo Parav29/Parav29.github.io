@@ -67,8 +67,8 @@ pre.flow { font: 13px/1.5 var(--mono); background: var(--panel); padding: 14px 1
   <div class="kpis">
     <div class="kpi"><b>5,007</b><span>synthetic patients over 100 days, every stage time pre-drawn</span></div>
     <div class="kpi"><b>38 / 38</b><span>verification checks passed (data 23, simulation 10, MIP 5)</span></div>
-    <div class="kpi"><b>−71%</b><span>overtime: 127 → 37 min a day vs "everyone at 08:00"</span></div>
-    <div class="kpi"><b>−33%</b><span>mean wait to drip: 316 → 213 min vs "everyone at 08:00"</span></div>
+    <div class="kpi"><b>−71%</b><span>overtime, two-time MIP alone: 127 → 37 min a day vs "everyone at 08:00"</span></div>
+    <div class="kpi"><b>−54% / −92%</b><span>wait / overtime with the full package (60% pre-cleared, pre-compounding, C11): 145 min, 10 min</span></div>
   </div>
 </header>
 
@@ -159,6 +159,7 @@ pre.flow { font: 13px/1.5 var(--mono); background: var(--panel); padding: 14px 1
 <tr><td>C8</td><td>Drug before chair; doctor clearance before drug (same-day)</td><td>The order of the 10-step flow</td><td>sim</td></tr>
 <tr><td>C9</td><td>Takedowns get nurses before new setups</td><td>Finished patients are released first</td><td>sim</td></tr>
 <tr><td>C10</td><td>A ready patient may start before their slot if a chair and nurse are free</td><td>Presentation 3 slide 9 "ready early" rule</td><td>sim</td></tr>
+<tr><td>C11 (added after E5)</td><td>Told arrivals per 15 min ≤ ⌊2 desks × 15 / 10⌋ = 3; same-day arrivals ≤ ⌊2 doctors × 15 / 15⌋ = 2</td><td>Do not send more people at once than registration and the doctors can serve</td><td>MIP (E7)</td></tr>
 </table></div>
 </div>
 
@@ -200,7 +201,8 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 <span class="lab">(C3) nurses</span> Σ<sub>g</sub> Σ<sub>t ≤ τ &lt; t+L<sub>g</sub></sub> ω<sub>g,τ−t</sub>·<i>y<sub>g,t</sub></i> ≤ M·N &nbsp;&nbsp;∀τ<br>
 <span class="lab">(C4) buffer</span> <i>y<sub>g,t</sub></i> = 0 for t &lt; r<sub>g</sub><br>
 <span class="lab">(C5) open</span> <i>z<sub>τ</sub></i> ≥ <i>z<sub>τ+1</sub></i> &nbsp;&nbsp;∀τ<br>
-<span class="lab">(C6) pharmacy</span> Σ<sub>g</sub> Σ<sub>t=τ</sub><sup>τ+1</sup> <i>y<sub>g,t</sub></i> ≤ ⌊H·30 / p̄⌋ &nbsp;&nbsp;∀τ &nbsp;(optional)
+<span class="lab">(C6) pharmacy</span> Σ<sub>g</sub> Σ<sub>t=τ</sub><sup>τ+1</sup> <i>y<sub>g,t</sub></i> ≤ ⌊H·30 / p̄⌋ &nbsp;&nbsp;∀τ &nbsp;(optional)<br>
+<span class="lab">(C11) arrivals</span> Σ<sub>g</sub> <i>y<sub>g, a+r<sub>g</sub></sub></i> ≤ ⌊D·15 / r̄eg⌋ ,&nbsp; Σ<sub>g same-day</sub> <i>y<sub>g, a+r<sub>g</sub></sub></i> ≤ ⌊Dr·15 / d̄oc⌋ &nbsp;&nbsp;∀a &nbsp;(told slot a = t − r<sub>g</sub>)
 </div>
 <p><b>Solving.</b></p>
 <ul>
@@ -379,10 +381,43 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 </ul>
 </div>
 
-<h3 id="e7">E7: arrival smoothing (constraint C7)</h3>
-<div class="pending"><p>Running. C7 caps told arrivals per 15 minutes at what the registration desks (3 per 15 min) and doctors (2 same-day per 15 min) can serve. E7 reruns the E5 fixes and the E6 grid with it. This section will be filled in when it finishes.</p></div>
+<h3 id="e7">E7: arrival smoothing (constraint C11), 40 days per row</h3>
+<div class="col"><p>C11 caps told arrivals per 15 minutes at what registration (3) and the doctors (2 same-day patients) can serve. When the solver cannot find a schedule within 15 s, it keeps a greedy schedule that also respects the cap.</p></div>
+<div class="tbl"><table>
+<tr><th>Scenario</th><th class="num">Mean wait</th><th class="num">P90 wait</th><th class="num">Overtime</th><th class="num">Registration queue</th><th class="num">Doctor queue</th></tr>
+<tr><td>Base, without C11 (E6, 40 days)</td><td class="num">212</td><td class="num">266</td><td class="num">32</td><td class="num">13</td><td class="num">10</td></tr>
+<tr><td>Base, with C11</td><td class="num">198</td><td class="num">249</td><td class="num">43</td><td class="num">4</td><td class="num">5</td></tr>
+<tr><td>+1 registration desk, with C11</td><td class="num">196</td><td class="num">246</td><td class="num">29</td><td class="num">1</td><td class="num">5</td></tr>
+<tr><td>Pre-clear 60%, with C11</td><td class="num">166</td><td class="num">243</td><td class="num">12</td><td class="num">5</td><td class="num">3</td></tr>
+<tr class="hl"><td><b>Pre-clear 60% + pre-compound, with C11</b></td><td class="num"><b>145</b></td><td class="num"><b>239</b></td><td class="num"><b>10</b></td><td class="num">5</td><td class="num">3</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Overtime with C11 (min)</th><th class="num">6 nurses</th><th class="num">8</th><th class="num">10</th><th class="num">12</th></tr>
+<tr><td>16 chairs</td><td class="num">173</td><td class="num">61</td><td class="num">60</td><td class="num">61</td></tr>
+<tr><td>20 chairs</td><td class="num">177</td><td class="num">43</td><td class="num">28</td><td class="num">30</td></tr>
+<tr><td>24 chairs</td><td class="num">175</td><td class="num">45</td><td class="num">19</td><td class="num">16</td></tr>
+</table></div>
+<div class="col">
+<ul>
+  <li><b>C11 fixes the "more nurses made it worse" result.</b> With 20 chairs, going from 8 to 10 nurses now cuts overtime from 43 to 28 min, where before it rose from 32 to 50.</li>
+  <li><b>Chairs and nurses must grow together.</b> With 16 chairs, nurses beyond 8 do nothing (61 min). With 24 chairs and 10–12 nurses, overtime falls to 16–19 min.</li>
+  <li><b>C11 trades a little overtime for a calmer front desk</b> at the base staffing: wait 212 → 198 min, both queues more than halved, overtime 32 → 43 min (CIs ±7–8).</li>
+  <li><b>The best combination in the whole study</b> is pre-clear 60%, pre-compound their drugs, and use the two-time MIP with C11: <b>145 min mean wait (−54% vs today's 316) and 10 min overtime (−92% vs 127)</b>, with no new staff.</li>
+</ul>
+</div>
 
-<h2><span class="n">8</span>Assumptions to review</h2>
+<h2><span class="n">8</span>Recommendation</h2>
+<div class="col">
+<ol>
+  <li><b>Give every patient two times</b>: an arrival time and a chair slot, separated by 90 min if pre-cleared and 210 min if same-day.</li>
+  <li><b>Pre-clear about 60% of patients the day before</b> by phone triage and outside labs, and <b>pre-compound their drugs</b> before opening.</li>
+  <li><b>Never send more patients at once than registration and the doctors can see</b> (C11).</li>
+  <li><b>Do not buy chairs first.</b> If capacity must grow, add nurses and chairs together, or add a registration desk.</li>
+  <li><b>On the field visit, measure lab turnaround first.</b> At 2–4 h, as TMH states, every buffer must be recomputed (E4).</li>
+</ol>
+</div>
+
+<h2><span class="n">9</span>Assumptions to review</h2>
 <div class="col">
 <ul>
   <li><b>Load 60%</b> instead of 80%, because 80% is infeasible (section 2).</li>
@@ -394,7 +429,7 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 </ul>
 </div>
 
-<h2><span class="n">9</span>Files</h2>
+<h2><span class="n">10</span>Files</h2>
 <div class="tbl"><table>
 <tr><th>What</th><th>Path in <code>ie301-chemo/</code></th></tr>
 <tr><td>Dataset and parameters</td><td class="m">data/synthetic_patients.csv · data/parameters.csv · data/infusion_mix.csv</td></tr>
@@ -402,7 +437,8 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 <tr><td>Formulation</td><td class="m">docs/FORMULATION.md · chemo/mip.py</td></tr>
 <tr><td>Simulation</td><td class="m">chemo/sim.py</td></tr>
 <tr><td>Verification reports</td><td class="m">results/verify_data.md · results/verify_sim.md · results/verify_mip.md · results/bruteforce_check.csv</td></tr>
-<tr><td>Experiment results</td><td class="m">results/E*_summary.csv (means and CIs) · results/E*_days.csv (per day)</td></tr>
-<tr><td>AnyLogic</td><td class="m">anylogic/ANYLOGIC_BUILD_GUIDE.md · data/anylogic_inputs.xlsx (after the experiments finish)</td></tr>
+<tr><td>Experiment results</td><td class="m">results/E1–E7 *_summary.csv (means and CIs) · *_days.csv (per day)</td></tr>
+<tr><td>AnyLogic</td><td class="m">anylogic/ANYLOGIC_BUILD_GUIDE.md · data/anylogic_inputs.xlsx · data/anylogic_reference_day0.csv</td></tr>
+<tr><td>Synthetic event log (TMH request format)</td><td class="m">data/synthetic_event_log.csv</td></tr>
 </table></div>
 </div>
