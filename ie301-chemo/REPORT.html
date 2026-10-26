@@ -295,10 +295,30 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 </div>
 <figure><img src="results/figures/mip_gantt.png" alt="Gantt chart of the MIP schedule for day 0 showing told arrival and chair time for each patient"><figcaption>The MIP schedule for day 0. The dotted line runs from told arrival to chair slot (the buffer); the bar is chair time.</figcaption></figure>
 
+<h3>E3: how much pre-clearance is enough? (main question)</h3>
+<div class="tbl"><table>
+<tr><th>Pre-cleared the day before</th><th class="num">Wait, 08:00 rule</th><th class="num">Wait, MIP</th><th class="num">P90 wait, MIP</th><th class="num">Overtime, 08:00 rule</th><th class="num">Overtime, MIP</th><th class="num">Chair-hours lost to "not ready"</th></tr>
+<tr><td>0%</td><td class="num">377</td><td class="num">238</td><td class="num">263</td><td class="num">185</td><td class="num">100</td><td class="num">91</td></tr>
+<tr><td>20%</td><td class="num">332</td><td class="num">218</td><td class="num">263</td><td class="num">141</td><td class="num">48</td><td class="num">80</td></tr>
+<tr><td>40%</td><td class="num">300</td><td class="num">204</td><td class="num">268</td><td class="num">107</td><td class="num">27</td><td class="num">67</td></tr>
+<tr class="hl"><td>60%</td><td class="num">271</td><td class="num">178</td><td class="num">260</td><td class="num">79</td><td class="num">15</td><td class="num">58</td></tr>
+<tr><td>80%</td><td class="num">256</td><td class="num">148</td><td class="num">229</td><td class="num">67</td><td class="num">8</td><td class="num">53</td></tr>
+<tr><td>100%</td><td class="num">250</td><td class="num">125</td><td class="num">142</td><td class="num">58</td><td class="num">3.5</td><td class="num">48</td></tr>
+</table></div>
+<figure><img src="results/figures/E3_preclear.png" alt="Three line charts of mean wait, overtime and idle chair time against the share of patients pre-cleared, for everyone-at-8 and the MIP"><figcaption>Wait and overtime in minutes. Bars show 95% confidence intervals over 100 days per point. The chair-hours column in the table is the right-hand panel ÷ 60.</figcaption></figure>
+<div class="col">
+<ul>
+  <li><b>Overtime has a knee at about 40–60% pre-cleared.</b> Under the MIP it falls 100 → 48 → 27 → 15 min, then only 8 → 3.5 min. Beyond about 60%, extra phone triage barely shortens the day.</li>
+  <li><b>Waiting keeps improving all the way to 100%</b> under the MIP (238 → 125 min), because every pre-cleared patient skips about 2 h of blood test, lab and review.</li>
+  <li><b>Under "everyone at 08:00" the wait flattens after about 60%</b> (271 → 250 min): the morning crowd at registration dominates. Pre-clearance pays off fully only together with staggered arrival times.</li>
+  <li><b>The best schedule changes shape:</b> at 0% pre-cleared, no chair can be used before about 11:30, so overtime is 100 min even with the MIP. At 60%, the morning chairs fill with pre-cleared patients.</li>
+  <li><b>Practical target:</b> pre-clear about 60% of patients, combined with the two-time rule. That gives 15 min overtime and a 178 min mean wait, against 127 min and 316 min today (E1).</li>
+</ul>
+</div>
+
 <h3>Still running</h3>
 <div class="pending">
 <ul>
-  <li><b>E3:</b> pre-cleared share 0–100%. Where does waiting stop improving?</li>
   <li><b>E4:</b> stage spreads and lateness halved and doubled, and a 2–4 h lab as at TMH.</li>
   <li><b>E5:</b> which fix buys the most: +2 nurses, +4 chairs, +1 hood, +1 doctor, +1 desk, pre-compounding, pharmacy cap, and the 80% load.</li>
   <li><b>E6:</b> chairs × nurses grid for the capacity problem from Presentation 1.</li>

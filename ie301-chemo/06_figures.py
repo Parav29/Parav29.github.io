@@ -71,8 +71,6 @@ def fig_e3():
         for i, (r, lab) in enumerate([("all8", "Everyone at 08:00"), ("mip", "Two times, MIP")]):
             g = s[s.rule == r]
             ax.errorbar(g.share, g[k], yerr=g[k + "_ci"], color=S[i], lw=2, marker="o", ms=7, capsize=3, label=lab)
-            ax.annotate(lab, (g.share.iloc[-1], g[k].iloc[-1]), xytext=(4, 0), textcoords="offset points",
-                        color=INK2, fontsize=8, va="center")
         ax.set_title(t)
         ax.set_xlabel("patients pre-cleared the day before (%)")
         ax.set_ylim(bottom=0)
