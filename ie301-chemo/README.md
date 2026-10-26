@@ -11,7 +11,7 @@ Dataset, simulation, optimisation and results for Topic 1, continuing from Prese
 | 3 | **Simulation** (Python, SimPy) | `chemo/sim.py` | `03_verify_sim.py` → `results/verify_sim.md` (10/10 pass + validation) |
 | 4 | **AnyLogic simulation** | `anylogic/ANYLOGIC_BUILD_GUIDE.md` + `data/anylogic_inputs.xlsx` | step 9 of the guide: match `data/anylogic_reference_day0.csv` |
 | 5 | **Optimisation formulation** | `docs/FORMULATION.md`, `chemo/mip.py` | `04_verify_mip.py` → `results/verify_mip.md` (5/5 pass) |
-| — | **Results, bottlenecks, fixes** | `REPORT.md`, `results/*.csv`, `results/figures/` | 100 seeded days per scenario, 95% CIs |
+| — | **Results, bottlenecks, fixes** | `REPORT.html`, `results/*.csv`, `results/figures/` | 100 seeded days per scenario, 95% CIs |
 
 ## Run it
 

@@ -1,0 +1,7 @@
+instance,patients,schedules_enumerated,feasible,brute_force_best,mip_objective,match,brute_force_s,mip_s,mip_makespan,mip_overtime_min
+1,"P60, P60, S120, P30",4800,12,378.0,378.0,True,0.7,0.04,12:00,120
+2,"P60, P30, P60, S30",12000,1247,208.0,208.0,True,1.4,0.03,11:00,60
+3,"S120, S60, S30, S60",2560,0,infeasible,infeasible,True,0.3,0.02,-,-
+4,"P120, S30, S60, P120",2880,0,infeasible,infeasible,True,0.4,0.02,-,-
+5,"P120, S120, P120, S60",1152,0,infeasible,infeasible,True,0.2,0.02,-,-
+6,"S30, S60, P120, P60",4800,7,384.0,384.0,True,0.6,0.02,12:00,120

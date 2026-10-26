@@ -1,0 +1,332 @@
+<title>INFUCINQ Chemo Unit Report</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Source+Serif+4:opsz,wght@8..60,500;8..60,650&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one reading column (~70ch) with wide tables and figures allowed to break out; section numbers follow the report's real order */
+:root {
+  --bg: #fbfbf9; --panel: #f1f2ef; --fg: #1b1d1f; --muted: #5a5f63; --rule: #dcdfdb;
+  --accent: #1f5f8b; --accent-soft: #e3edf4; --good: #2f7d4f; --warn: #a1620a;
+  --display: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #15181a; --panel: #1e2225; --fg: #e7e9e8; --muted: #a5abaf; --rule: #30363a;
+  --accent: #79b4dc; --accent-soft: #1d3140; --good: #6cc391; --warn: #e2a64a; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #15181a; --panel: #1e2225; --fg: #e7e9e8; --muted: #a5abaf; --rule: #30363a;
+  --accent: #79b4dc; --accent-soft: #1d3140; --good: #6cc391; --warn: #e2a64a; color-scheme: dark }
+* { box-sizing: border-box }
+body { background: var(--bg); color: var(--fg); font: 15.5px/1.62 var(--body); margin: 0 }
+.wrap { max-width: 980px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)) }
+.col { max-width: 70ch }
+header { border-bottom: 1px solid var(--rule); padding-bottom: 24px; margin-bottom: 8px }
+.eyebrow { font: 500 12px/1.4 var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted) }
+h1 { font: 650 clamp(28px, 4.5vw, 40px)/1.15 var(--display); margin: 10px 0 12px; text-wrap: balance }
+h2 { font: 650 25px/1.25 var(--display); margin: 56px 0 12px; text-wrap: balance; display: flex; gap: 12px; align-items: baseline }
+h2 .n { font: 500 14px var(--mono); color: var(--accent) }
+h3 { font: 600 17px/1.35 var(--body); margin: 30px 0 8px }
+p, li { max-width: 70ch }
+a { color: var(--accent) }
+code, .m { font-family: var(--mono); font-size: .9em }
+.lede { font-size: 17px; color: var(--muted) }
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 12px; margin: 24px 0 8px }
+.kpi { background: var(--panel); border-radius: 8px; padding: 14px 16px }
+.kpi b { display: block; font: 650 28px/1.1 var(--display); font-variant-numeric: tabular-nums }
+.kpi span { font-size: 13px; color: var(--muted) }
+.tbl { overflow-x: auto; margin: 14px 0 18px; border: 1px solid var(--rule); border-radius: 8px }
+table { border-collapse: collapse; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums }
+th, td { text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--rule); vertical-align: top }
+th { font-weight: 600; background: var(--panel); white-space: nowrap }
+tr:last-child td { border-bottom: 0 }
+td.num, th.num { text-align: right; white-space: nowrap }
+tr.hl td { background: var(--accent-soft) }
+.pass { color: var(--good); font-weight: 600 }
+.note { color: var(--warn); font-weight: 600 }
+.status { display: inline-block; font: 500 11.5px/1 var(--mono); padding: 4px 7px; border-radius: 4px; background: var(--panel); color: var(--muted) }
+.eq { background: var(--panel); border-radius: 8px; padding: 14px 18px; margin: 12px 0; font: 14.5px/1.9 var(--mono); overflow-x: auto; white-space: nowrap }
+.eq i { font-family: var(--display); font-style: italic; font-size: 1.05em }
+.eq .lab { color: var(--muted); display: inline-block; min-width: 13ch }
+figure { margin: 18px 0 26px }
+figure img { width: 100%; border-radius: 6px; border: 1px solid var(--rule); background: #fcfcfb }
+figcaption { font-size: 13px; color: var(--muted); margin-top: 6px; max-width: 80ch }
+.callout { border-left: 3px solid var(--accent); padding: 4px 0 4px 16px; margin: 16px 0 }
+.pending { border: 1px dashed var(--rule); border-radius: 8px; padding: 14px 18px; color: var(--muted) }
+ul { padding-left: 20px } li { margin: 4px 0 }
+pre.flow { font: 13px/1.5 var(--mono); background: var(--panel); padding: 14px 18px; border-radius: 8px; overflow-x: auto }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px }
+</style>
+
+<div class="wrap">
+<header>
+  <div class="eyebrow">IE301 Operations Analysis · Topic 1 · Team INFUCINQ · after Presentation 3</div>
+  <h1>Day-care chemotherapy unit: dataset, formulation and first results</h1>
+  <p class="lede col">What we built after the Tata Memorial visit: a synthetic dataset traced to published sources, a simulation of the 10-step flow, an integer programme that sets two times for every patient, and the checks that each part does what it claims.</p>
+  <div class="kpis">
+    <div class="kpi"><b>5,007</b><span>synthetic patients over 100 days, every stage time pre-drawn</span></div>
+    <div class="kpi"><b>38 / 38</b><span>verification checks passed (data 23, simulation 10, MIP 5)</span></div>
+    <div class="kpi"><b>−71%</b><span>overtime: 127 → 37 min a day vs "everyone at 08:00"</span></div>
+    <div class="kpi"><b>−33%</b><span>mean wait to drip: 316 → 213 min vs "everyone at 08:00"</span></div>
+  </div>
+</header>
+
+<h2><span class="n">1</span>What was done</h2>
+<div class="col">
+<ol>
+  <li><b>Searched for data.</b> Kaggle and the literature have no public per-patient timestamps for an infusion unit. We built a synthetic dataset instead, with every input tied to a paper or to an assumption from Presentation 3.</li>
+  <li><b>Verified the data</b> against its own specification and against the Presentation 3 numbers.</li>
+  <li><b>Built a discrete-event simulation</b> (Python, SimPy) of the 10-step flow the TMH doctors confirmed, and verified it.</li>
+  <li><b>Wrote the optimisation model</b>: a chance-constrained booking rule plus a time-indexed integer programme for chair slots. We verified it against brute force.</li>
+  <li><b>Ran the experiments from slide 10</b> on 100 identical simulated days, reporting 95% confidence intervals. E1 and E2 are complete; E3–E6 are still running.</li>
+  <li><b>Prepared the AnyLogic version</b>: a build guide and a data workbook, so AnyLogic replays exactly the same days.</li>
+</ol>
+<p>Code, data and figures are in the <code>ie301-chemo/</code> folder on branch <code>claude/busy-pascal-b1i9cm</code>.</p>
+</div>
+
+<h2><span class="n">2</span>The dataset</h2>
+<div class="col">
+<p>Every patient is drawn first, and then every stage time is drawn for that patient. Each day has its own seed, so every booking rule is tested on <b>exactly the same days</b> (common random numbers). The class is set by comparing one stored random number with the pre-cleared share, so changing that share changes nothing else about the day.</p>
+<p>Patients are added until the planned chair time fills 60% of the 20 chairs × 10 hours. Planned chair time is setup plus planned infusion plus takedown.</p>
+</div>
+
+<h3>Size and contents</h3>
+<div class="tbl"><table>
+<tr><th>Item</th><th class="num">Value</th><th>Note</th></tr>
+<tr><td>Days</td><td class="num">100</td><td>seed 301; byte-identical when regenerated</td></tr>
+<tr><td>Booked patients</td><td class="num">5,007</td><td>50.1 per day (min 39, max 60, SD 4.1)</td></tr>
+<tr><td>Same-day / pre-cleared</td><td class="num">3,593 / 1,414</td><td>28.2% pre-cleared (target 30%)</td></tr>
+<tr><td>Found unfit at review</td><td class="num">384</td><td>7.7% (target 8%)</td></tr>
+<tr><td>Of those, pre-cleared and known the day before</td><td class="num">110</td><td>their slots are released a day early</td></tr>
+<tr><td>No-shows</td><td class="num">269</td><td>5.4% (target 5%)</td></tr>
+<tr><td>Planned infusion, mean</td><td class="num">105.5 min</td><td>30: 2,250 · 60: 265 · 120: 898 · 180: 926 · 240: 585 · 360: 83</td></tr>
+<tr><td>Actual infusion, mean</td><td class="num">107.0 min</td><td>27–385 min; MAPE vs planned 10.3%</td></tr>
+</table></div>
+
+<h3>Inputs, with source and status</h3>
+<div class="tbl"><table>
+<tr><th>Input</th><th>Distribution (minutes)</th><th>Source</th><th>Status</th></tr>
+<tr><td>Arrival deviation from told time</td><td class="m">Tri(−30, 0, 30)</td><td>Presentation 3; punctuality studies (84–91% arrive early)</td><td><span class="status">Placeholder</span></td></tr>
+<tr><td>Registration</td><td class="m">Tri(5, 10, 15)</td><td>Presentation 3, flow confirmed at TMH</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Blood draw</td><td class="m">Tri(5, 7.5, 10)</td><td>Presentation 3</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Lab result</td><td class="m">Tri(60, 90, 120)</td><td>Presentation 3; TMH states 4 h for a hemogram (test scenario)</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Doctor review</td><td class="m">Tri(10, 15, 20)</td><td>Presentation 3</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Billing / scheme approval</td><td class="m">Tri(30, 45, 60)</td><td>Presentation 3</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Pharmacy preparation</td><td class="m">Tri(15, 22.5, 30)</td><td>Presentation 3; 17–27 min lead time (EJHP); 7–14 min compounding</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Line + pre-meds (nurse 1:1)</td><td class="m">Tri(20, 30, 40)</td><td>Presentation 3; Hesaraki 2019</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Takedown (nurse 1:1)</td><td class="m">Tri(5, 10, 15)</td><td>Athawale 2015: nurse load peaks at the start and end</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Discharge (chair already free)</td><td class="m">Tri(15, 22.5, 30)</td><td>Presentation 2</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Planned infusion mix</td><td class="m">30: 45.5% · 60: 5.5% · 120: 18.2% · 180: 18.2% · 240: 10.9% · 360: 1.8%</td><td>one real clinic day, n = 55 (PMC6550030); Liang 2015 also reports ~45% at 30 min</td><td><span class="status">Borrowed</span></td></tr>
+<tr><td>Actual ÷ planned infusion</td><td class="m">≤60: Tri(0.9, 1.0, 1.6) · mid: Tri(0.85, 1.0, 1.2) · ≥240: Tri(0.75, 0.95, 1.1)</td><td>Hacettepe (short ones run long, long ones finish early; MAPE 16.9%); Bath; Mayo</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Unfit at review</td><td class="m">8%</td><td>NCT00883181 (~8% of cycles delayed); PMC2360274</td><td><span class="status">Borrowed</span></td></tr>
+<tr><td>No-show</td><td class="m">5%</td><td>below the 9.5% (neurology) and 20% (Kaggle) general-clinic figures</td><td><span class="status">Assumed</span></td></tr>
+<tr><td>Pre-cleared share</td><td class="m">30% (varied 0–100%)</td><td>Kochi telephone triage; TMH visit</td><td><span class="status">Assumed</span></td></tr>
+</table></div>
+
+<h3>Unit (base case)</h3>
+<div class="col"><p>20 chairs · 8 nurses · one nurse sets up 1 patient or monitors 4 · 2 registration desks · 2 doctors · 3 pharmacy hoods · open 08:00–18:00 · bookings fill 60% of chair-hours.</p>
+<p class="callout">Presentation 3 assumed 80% load. The simulation shows that 80% is infeasible: same-day patients cannot be ready before about 11:30, so overtime stays above 2 hours under every rule, even with 10 nurses. The base case is therefore 60%. 80% stays in as a stress test.</p></div>
+
+<h3>Data verification (23 / 23 pass)</h3>
+<div class="tbl"><table>
+<tr><th>Check</th><th>Result</th><th>Detail</th></tr>
+<tr><td>Every stage: inside its bounds, mean on target, Kolmogorov–Smirnov test vs its triangular</td><td class="pass">10 / 10 PASS</td><td>e.g. lab mean 90.06 vs 90.00, KS p = 0.34</td></tr>
+<tr><td>Infusion mix vs the published histogram</td><td class="pass">PASS</td><td>chi-square p = 0.49</td></tr>
+<tr><td>Infusion error direction, size, range</td><td class="pass">3 / 3 PASS</td><td>short ×1.17, long ×0.94; MAPE 10.3% (lower than Hacettepe's 16.9%; E4 doubles the spread)</td></tr>
+<tr><td>Unfit, no-show and pre-cleared rates (99.9% CI)</td><td class="pass">3 / 3 PASS</td><td>0.077 / 0.054 / 0.282</td></tr>
+<tr><td>Prior-day deferrals consistent</td><td class="pass">PASS</td><td>only pre-cleared and unfit</td></tr>
+<tr><td>Daily booked chair-minutes</td><td class="pass">PASS</td><td>7,200–7,590 vs target 7,200</td></tr>
+<tr><td>Reproducible from seed</td><td class="pass">PASS</td><td>identical MD5 on regeneration</td></tr>
+<tr><td>Common random numbers across pre-cleared share</td><td class="pass">PASS</td><td>only the class changes</td></tr>
+<tr><td>Presentation 3 buffers reproduced</td><td class="pass">PASS</td><td>pre-cleared 89.8 (slide: 89.9) · same-day 206.2 (slide: 206.2)</td></tr>
+<tr><td>No-queue wait vs Kochi 3.5 h</td><td class="pass">PASS</td><td>sum of stage means = 220 min (3.67 h)</td></tr>
+</table></div>
+<div class="col"><p>Files: <code>data/synthetic_patients.csv</code> (one row per patient, all stage times), <code>data/parameters.csv</code>, <code>data/infusion_mix.csv</code>, <code>docs/SOURCES.md</code> (22 inputs, 6 validation targets, datasets checked).</p></div>
+
+<h2><span class="n">3</span>The constraints</h2>
+<div class="col">
+<p>These are the rules every schedule and every simulated day must obey.</p>
+<div class="tbl"><table>
+<tr><th>#</th><th>Constraint</th><th>In plain words</th><th>Where</th></tr>
+<tr><td>C1</td><td>Every patient gets exactly one chair slot</td><td>Nobody is left unbooked; overtime is allowed but penalised</td><td>MIP</td></tr>
+<tr><td>C2</td><td>Chairs in use ≤ K (20) at every 15-min slot</td><td>Setup, infusion and takedown all occupy the chair</td><td>MIP + sim</td></tr>
+<tr><td>C3</td><td>M × (patients in setup or takedown) + (patients on the drip) ≤ M × N</td><td>A nurse setting up or taking down is fully busy; otherwise one nurse watches 4 drips (Hesaraki 2019)</td><td>MIP + sim</td></tr>
+<tr><td>C4</td><td>Chair slot ≥ told arrival + B<sub>c</sub></td><td>The buffer: 90 min for pre-cleared, 210 min for same-day patients (q = 0.8)</td><td>MIP</td></tr>
+<tr><td>C5</td><td>Unit counts as open at slot τ only if it was open at τ − 1</td><td>Makes makespan and overtime measurable inside the MIP</td><td>MIP</td></tr>
+<tr><td>C6 (optional)</td><td>Chair starts per 30 min ≤ ⌊3 hoods × 30 / 22.5⌋ = 4</td><td>Pharmacy smoothing; tested as a variant</td><td>MIP</td></tr>
+<tr><td>C7</td><td>Desks, doctors and hoods serve one patient each at a time</td><td>Queues form when they are busy</td><td>sim</td></tr>
+<tr><td>C8</td><td>Drug before chair; doctor clearance before drug (same-day)</td><td>The order of the 10-step flow</td><td>sim</td></tr>
+<tr><td>C9</td><td>Takedowns get nurses before new setups</td><td>Finished patients are released first</td><td>sim</td></tr>
+<tr><td>C10</td><td>A ready patient may start before their slot if a chair and nurse are free</td><td>Presentation 3 slide 9 "ready early" rule</td><td>sim</td></tr>
+</table></div>
+</div>
+
+<h2><span class="n">4</span>The formulation</h2>
+<div class="col">
+<p>Three levels, solved in the order the decisions are made. The simulation scores the result.</p>
+<pre class="flow">Level 1  Capacity       chairs K, nurses N        grid search, scored by simulation   (E6)
+Level 2  Booking rule   buffer B_c = F_c⁻¹(q)      chance constraint (newsvendor)       (E2, E3)
+Level 3  Daily slots    chair slot s_i per patient time-indexed integer programme       (solved each day)
+         ─────────────────────────────────────────────────────────────────────────────────────────
+         Evaluation     simulated day, 100 seeded days, 95% confidence intervals</pre>
+
+<h3>Level 0: problem statement (Presentation 1)</h3>
+<div class="eq"><span class="lab">minimise</span> c<sub>K</sub>·<i>K</i> + c<sub>N</sub>·<i>N</i> + c<sub>O</sub>·E[overtime]<br>
+<span class="lab">subject to</span> P90(wait) ≤ <i>W</i> ,&nbsp;&nbsp; patients treated per day ≥ λ</div>
+
+<h3>Level 2: two times per patient (chance constraint)</h3>
+<p><i>a<sub>i</sub></i> is the arrival time told to the patient. <i>s<sub>i</sub></i> is the chair slot. <i>D<sub>i</sub></i> is the random delay from told arrival to drug ready.</p>
+<ul>
+  <li>Pre-cleared: <i>D</i> = lateness + registration + billing + pharmacy.</li>
+  <li>Same-day: add blood draw, lab and doctor review.</li>
+</ul>
+<div class="eq"><span class="lab">require</span> P( <i>a<sub>i</sub></i> + <i>D<sub>i</sub></i> ≤ <i>s<sub>i</sub></i> ) ≥ <i>q</i> &nbsp;⟺&nbsp; <i>s<sub>i</sub></i> − <i>a<sub>i</sub></i> ≥ F<sub>c</sub><sup>−1</sup>(<i>q</i>) = B<sub>c</sub><br>
+<span class="lab">choose</span> <i>a<sub>i</sub></i> = <i>s<sub>i</sub></i> − B<sub>c</sub> &nbsp;&nbsp;(any extra gap is pure patient waiting)<br>
+<span class="lab">q = 0.8 gives</span> B<sub>P</sub> = 89.9 → 90 min,&nbsp; B<sub>S</sub> = 206.2 → 210 min</div>
+<p>The buffer is a newsvendor quantile. If one idle chair-minute costs <i>c</i><sub>idle</sub> and one patient waiting-minute costs <i>c</i><sub>wait</sub>, the best <i>q</i> is <i>c</i><sub>idle</sub> / (<i>c</i><sub>idle</sub> + <i>c</i><sub>wait</sub>). So choosing <i>q</i> is choosing how much an empty chair matters compared with a waiting patient.</p>
+
+<h3>Level 3: daily chair-slot integer programme</h3>
+<p>The grid has 15-minute slots <i>t</i> = 0 … <i>T</i>−1 from 08:00, with closing at slot <i>T<sub>c</sub></i> (18:00) and 4 hours of possible overtime after it.</p>
+<p>Patients with the same class, planned infusion and release are interchangeable. They form a group <i>g</i> of size <i>n<sub>g</sub></i>, needing <i>L<sub>g</sub></i> chair slots: 2 for setup, the infusion, and 1 for takedown.</p>
+<p>The nurse load of a group-<i>g</i> patient in their <i>k</i>-th chair slot is ω<sub>g,k</sub>: <i>M</i> during setup and takedown, 1 during infusion.</p>
+<div class="eq">
+<span class="lab">variables</span> <i>y<sub>g,t</sub></i> ∈ ℤ<sub>≥0</sub> : patients of group g starting at slot t &nbsp;(t ≥ r<sub>g</sub> = ⌈B<sub>c</sub>/15⌉)<br>
+<span class="lab"></span> <i>z<sub>τ</sub></i> ∈ {0,1} : unit still open at slot τ<br><br>
+<span class="lab">minimise</span> Σ<sub>g,t</sub> (t + L<sub>g</sub>)·<i>y<sub>g,t</sub></i> &nbsp;+&nbsp; w<sub>m</sub>·Σ<sub>τ</sub> <i>z<sub>τ</sub></i> &nbsp;+&nbsp; w<sub>o</sub>·Σ<sub>τ≥T<sub>c</sub></sub> <i>z<sub>τ</sub></i><br>
+<span class="lab"></span> (flowtime + makespan + overtime;&nbsp; w<sub>m</sub> = n/4,&nbsp; w<sub>o</sub> = 10n)<br><br>
+<span class="lab">(C1) booked</span> Σ<sub>t</sub> <i>y<sub>g,t</sub></i> = n<sub>g</sub> &nbsp;&nbsp;∀g<br>
+<span class="lab">(C2) chairs</span> Σ<sub>g</sub> Σ<sub>t ≤ τ &lt; t+L<sub>g</sub></sub> <i>y<sub>g,t</sub></i> ≤ K·<i>z<sub>τ</sub></i> &nbsp;&nbsp;∀τ<br>
+<span class="lab">(C3) nurses</span> Σ<sub>g</sub> Σ<sub>t ≤ τ &lt; t+L<sub>g</sub></sub> ω<sub>g,τ−t</sub>·<i>y<sub>g,t</sub></i> ≤ M·N &nbsp;&nbsp;∀τ<br>
+<span class="lab">(C4) buffer</span> <i>y<sub>g,t</sub></i> = 0 for t &lt; r<sub>g</sub><br>
+<span class="lab">(C5) open</span> <i>z<sub>τ</sub></i> ≥ <i>z<sub>τ+1</sub></i> &nbsp;&nbsp;∀τ<br>
+<span class="lab">(C6) pharmacy</span> Σ<sub>g</sub> Σ<sub>t=τ</sub><sup>τ+1</sup> <i>y<sub>g,t</sub></i> ≤ ⌊H·30 / p̄⌋ &nbsp;&nbsp;∀τ &nbsp;(optional)
+</div>
+<p><b>Solving.</b></p>
+<ul>
+  <li><b>Size:</b> about 560 variables and 950 constraints for a 50-patient day.</li>
+  <li><b>Solver:</b> HiGHS, started from the best of 42 greedy schedules, with a 15 s limit and a 1% gap. The mean solve time is 6.9 s.</li>
+  <li><b>Earlier version:</b> the first formulation used a binary for each (group, start) pair linked to makespan. It did not converge in 60 s. Putting <i>z<sub>τ</sub></i> into the chair constraint (C2) is what makes the model fast.</li>
+  <li><b>Why not one big stochastic model:</b> Hadid 2022 searched every appointment time inside a simulation and needed about 13 hours for 246 appointments. Here the randomness sits in two numbers, B<sub>P</sub> and B<sub>S</sub>.</li>
+</ul>
+</div>
+
+<h2><span class="n">5</span>Verification of the formulation, including brute force</h2>
+<div class="col"><p><b>Brute-force search</b>: on small instances, every possible combination of start times is enumerated, the infeasible ones are discarded, and the best objective is recorded. The MIP must find the same optimum. The instances have 4 patients, 2 chairs, 2 nurses (M = 4), a 2-hour day plus 2 hours of overtime, and same-day patients released 30 min later.</p></div>
+<div class="tbl"><table>
+<tr><th>Instance</th><th>Patients (class, planned min)</th><th class="num">Schedules enumerated</th><th class="num">Feasible</th><th class="num">Brute-force best</th><th class="num">MIP</th><th>Match</th></tr>
+<tr><td>1</td><td class="m">P60, P60, S120, P30</td><td class="num">4,800</td><td class="num">12</td><td class="num">378</td><td class="num">378</td><td class="pass">exact</td></tr>
+<tr><td>2</td><td class="m">P60, P30, P60, S30</td><td class="num">12,000</td><td class="num">1,247</td><td class="num">208</td><td class="num">208</td><td class="pass">exact</td></tr>
+<tr><td>3</td><td class="m">S120, S60, S30, S60</td><td class="num">2,560</td><td class="num">0</td><td class="num">infeasible</td><td class="num">infeasible</td><td class="pass">agree</td></tr>
+<tr><td>4</td><td class="m">P120, S30, S60, P120</td><td class="num">2,880</td><td class="num">0</td><td class="num">infeasible</td><td class="num">infeasible</td><td class="pass">agree</td></tr>
+<tr><td>5</td><td class="m">P120, S120, P120, S60</td><td class="num">1,152</td><td class="num">0</td><td class="num">infeasible</td><td class="num">infeasible</td><td class="pass">agree</td></tr>
+<tr><td>6</td><td class="m">S30, S60, P120, P60</td><td class="num">4,800</td><td class="num">7</td><td class="num">384</td><td class="num">384</td><td class="pass">exact</td></tr>
+</table></div>
+<div class="col"><p>6 of 6 agree. Three instances are infeasible: in a 4-hour window the nurse limit leaves no room for all four patients, and the MIP proves that correctly. The brute force takes 0.2–1.4 s per instance and the MIP 0.02–0.04 s. Brute force cannot handle a real day: with 50 patients and about 40 start times each, there are roughly 40<sup>50</sup> combinations.</p></div>
+
+<div class="tbl"><table>
+<tr><th>Other checks on real days (20 days)</th><th>Result</th><th>Detail</th></tr>
+<tr><td>Independent code re-checks every MIP schedule against C1–C5</td><td class="pass">PASS</td><td>20 / 20 feasible; chairs ≤ 20, nurse units ≤ 32</td></tr>
+<tr><td>MIP objective ≤ greedy objective</td><td class="pass">PASS</td><td>20 / 20; greedy is 48% worse on average (max 70%)</td></tr>
+<tr><td>Planned overtime</td><td class="pass">PASS</td><td>11 min (MIP) vs 76 min (greedy)</td></tr>
+<tr><td>Solve time</td><td class="pass">PASS</td><td>mean 6.9 s, max 15.2 s per day</td></tr>
+</table></div>
+
+<h2><span class="n">6</span>The simulation and its checks</h2>
+<div class="col"><p>The simulation plays out one day: arrive → register (desk) → [same-day: blood draw → lab → doctor review, unfit go home] → billing → pharmacy (hood) → wait for chair + nurse → line/pre-meds → infusion → takedown → discharge. Every stage time comes from the dataset row, so the same day replays exactly.</p></div>
+<div class="tbl"><table>
+<tr><th>Check</th><th>Result</th><th>Detail</th></tr>
+<tr><td>Hand calculation, one patient per class</td><td class="pass">2 / 2 PASS</td><td>infusion starts 700.0 and 587.5, exactly as calculated by hand</td></tr>
+<tr><td>Capacity never exceeded (80 days × 4 rules)</td><td class="pass">PASS</td><td>0 violations</td></tr>
+<tr><td>Patients conserved; timestamps in order</td><td class="pass">2 / 2 PASS</td><td>booked = treated + unfit + no-show</td></tr>
+<tr><td>Little's law; chair-minutes balance</td><td class="pass">2 / 2 PASS</td><td>differences below 4 × 10<sup>−12</sup></td></tr>
+<tr><td>Hesaraki nurse rule at every minute (N = 2)</td><td class="pass">PASS</td><td>max 8 ≤ M·N = 8</td></tr>
+<tr><td>Unlimited capacity reproduces slide 7</td><td class="pass">PASS</td><td>80th percentile 90.2 (89.9) and 206.4 (206.2)</td></tr>
+<tr><td>Same input, same output</td><td class="pass">PASS</td><td>deterministic replay</td></tr>
+</table></div>
+<div class="tbl"><table>
+<tr><th>Validation against Indian figures</th><th>Model</th><th>Published</th><th>Verdict</th></tr>
+<tr><td>Wait, 0% pre-cleared, appointments told 1 h early</td><td class="num">4.11 h</td><td>Kochi 3.5 h</td><td class="pass">within 20%</td></tr>
+<tr><td>Wait, 0% pre-cleared, everyone told 08:00</td><td class="num">6.28 h</td><td>Kochi 3.5 h</td><td class="note">above: registration queue 90 min, doctor queue 56 min</td></tr>
+<tr><td>Time in unit, appointments</td><td class="num">6.47 h</td><td>5 h 40 (SD 3 h 42)</td><td class="pass">within 20%</td></tr>
+<tr><td>Morning chair-hours lost to "patient here, not ready"</td><td class="num">37%</td><td>Presentation 3: 35%</td><td class="pass">match</td></tr>
+</table></div>
+<div class="col"><p>The stage times alone add up to 3.67 h before any queue. Kochi's 3.5 h therefore fits the stage times. "Everyone at 08:00" overshoots because of the morning crush at registration and at the doctors. We report that as it is and did not tune the model to hit 3.5 h.</p></div>
+
+<h2><span class="n">7</span>Results</h2>
+<h3>E1: does the two-time rule beat simple practice? (100 days, 30% pre-cleared)</h3>
+<div class="tbl"><table>
+<tr><th>Rule</th><th class="num">Mean wait (min)</th><th class="num">P90 wait</th><th class="num">Same-day wait</th><th class="num">Pre-cleared wait</th><th class="num">Overtime (min)</th><th class="num">Registration queue</th><th class="num">Doctor queue</th></tr>
+<tr><td>Everyone at 08:00</td><td class="num">316 ± 4</td><td class="num">452</td><td class="num">358</td><td class="num">206</td><td class="num">127 ± 11</td><td class="num">88</td><td class="num">18</td></tr>
+<tr><td>Longest first, told 1 h early</td><td class="num">206 ± 2</td><td class="num">266</td><td class="num">239</td><td class="num">122</td><td class="num">106 ± 6</td><td class="num">10</td><td class="num">6</td></tr>
+<tr><td>Shortest first, told 1 h early</td><td class="num">208 ± 3</td><td class="num">266</td><td class="num">242</td><td class="num">121</td><td class="num">264 ± 13</td><td class="num">7</td><td class="num">6</td></tr>
+<tr><td>Two times, greedy</td><td class="num">208 ± 2</td><td class="num">262</td><td class="num">238</td><td class="num">128</td><td class="num">60 ± 7</td><td class="num">13</td><td class="num">6</td></tr>
+<tr class="hl"><td><b>Two times, MIP</b></td><td class="num">213 ± 2</td><td class="num">267</td><td class="num">245</td><td class="num">129</td><td class="num"><b>37 ± 5</b></td><td class="num">13</td><td class="num">10</td></tr>
+</table></div>
+<figure><img src="results/figures/E1_rules.png" alt="Bar charts of mean wait and overtime for five booking rules; the two-time MIP has the lowest overtime at 36 minutes"><figcaption>Mean wait and overtime by booking rule. Bars show 95% confidence intervals over 100 identical days.</figcaption></figure>
+<div class="col">
+<ul>
+  <li><b>Against current practice:</b> the two-time MIP cuts overtime by 71% (127 → 37 min) and mean wait by 33% (316 → 213 min).</li>
+  <li><b>Against the best simple rule</b> (longest first): the wait is about the same (206 vs 213 min), and overtime is 65% lower (106 → 37 min).</li>
+  <li><b>Shortest first is the worst on overtime</b> (264 min), because long infusions are pushed to the end of the day.</li>
+</ul>
+</div>
+
+<h3>E2: how big should the buffer be?</h3>
+<div class="tbl"><table>
+<tr><th>Coverage q</th><th class="num">Buffers P / S (min)</th><th class="num">Mean wait</th><th class="num">Overtime</th><th class="num">Patient late for own slot</th></tr>
+<tr><td>0.50</td><td class="num">75 / 195</td><td class="num">212.4</td><td class="num">39.8</td><td class="num">20.2</td></tr>
+<tr><td>0.65</td><td class="num">90 / 210</td><td class="num">212.5</td><td class="num">36.5</td><td class="num">13.1</td></tr>
+<tr><td>0.80</td><td class="num">90 / 210</td><td class="num">212.5</td><td class="num">36.5</td><td class="num">13.1</td></tr>
+<tr><td>0.95</td><td class="num">105 / 225</td><td class="num">212.3</td><td class="num">34.8</td><td class="num">6.1</td></tr>
+</table></div>
+<div class="col"><p>The result is flat. Patients who are ready early may start early (C10), so the schedule absorbs a wrong buffer. A larger buffer mainly makes patients less late for their own slot. q = 0.65 and 0.80 round to the same 15-minute buffers.</p></div>
+
+<h3>Bottlenecks</h3>
+<figure><img src="results/figures/bottlenecks.png" alt="Left: idle chair-hours split into patient not ready, no nurse, and nobody to treat. Right: queue time per patient at registration, doctor, pharmacy and chair"><figcaption>Left: why chairs sit idle between 08:00 and 18:00 (of 200 chair-hours). Right: where patients queue.</figcaption></figure>
+<figure><img src="results/figures/day_curves.png" alt="Chairs, nurses and ready queue through one day for everyone-at-8 and the MIP"><figcaption>One simulated day. Under the MIP, nurses are at their limit of 8 from about 11:00 to 17:00 while chairs never pass 19.</figcaption></figure>
+<div class="col">
+<ol>
+  <li><b>Ready time</b> is the biggest loss: about 37% of chair-hours are lost because the patient is in the unit but not yet ready. Same-day patients cannot reach a chair before about 11:30. The fix is pre-clearance; E3 measures how much it helps.</li>
+  <li><b>Nurses</b> are the binding resource in the afternoon, not chairs.</li>
+  <li><b>The front desk and doctors</b> are swamped only when everyone arrives at 08:00 (registration queue 88 min). Any staggered arrival times remove this.</li>
+  <li><b>Pharmacy</b> is not a bottleneck at 3 hoods: queues are 2–3 min.</li>
+</ol>
+</div>
+<figure><img src="results/figures/mip_gantt.png" alt="Gantt chart of the MIP schedule for day 0 showing told arrival and chair time for each patient"><figcaption>The MIP schedule for day 0. The dotted line runs from told arrival to chair slot (the buffer); the bar is chair time.</figcaption></figure>
+
+<h3>Still running</h3>
+<div class="pending">
+<ul>
+  <li><b>E3:</b> pre-cleared share 0–100%. Where does waiting stop improving?</li>
+  <li><b>E4:</b> stage spreads and lateness halved and doubled, and a 2–4 h lab as at TMH.</li>
+  <li><b>E5:</b> which fix buys the most: +2 nurses, +4 chairs, +1 hood, +1 doctor, +1 desk, pre-compounding, pharmacy cap, and the 80% load.</li>
+  <li><b>E6:</b> chairs × nurses grid for the capacity problem from Presentation 1.</li>
+</ul>
+<p>This page will be updated when they finish.</p>
+</div>
+
+<h2><span class="n">8</span>Assumptions to review</h2>
+<div class="col">
+<ul>
+  <li><b>Load 60%</b> instead of 80%, because 80% is infeasible (section 2).</li>
+  <li><b>8 nurses</b>, about 6 patients per nurse per shift. There is no ONS or NABH ratio; published ranges are 3–20, and the Cleveland Clinic target is 1:6.</li>
+  <li><b>Early starts allowed</b> (C10). This is why buffer size barely matters; a "no early start" run is a fair next test.</li>
+  <li><b>Takedown needs a whole nurse</b> (from Athawale), and <b>billing is a delay, not a queue</b>.</li>
+  <li><b>All step times from Presentation 3 are kept unchanged</b>, so results stay consistent with what was presented.</li>
+  <li><b>Published figures not yet checked against full text.</b> They came from abstracts and search excerpts, because the build environment could not open journal pages. Check them before quoting on slides.</li>
+</ul>
+</div>
+
+<h2><span class="n">9</span>Files</h2>
+<div class="tbl"><table>
+<tr><th>What</th><th>Path in <code>ie301-chemo/</code></th></tr>
+<tr><td>Dataset and parameters</td><td class="m">data/synthetic_patients.csv · data/parameters.csv · data/infusion_mix.csv</td></tr>
+<tr><td>Sources</td><td class="m">docs/SOURCES.md</td></tr>
+<tr><td>Formulation</td><td class="m">docs/FORMULATION.md · chemo/mip.py</td></tr>
+<tr><td>Simulation</td><td class="m">chemo/sim.py</td></tr>
+<tr><td>Verification reports</td><td class="m">results/verify_data.md · results/verify_sim.md · results/verify_mip.md · results/bruteforce_check.csv</td></tr>
+<tr><td>Experiment results</td><td class="m">results/E*_summary.csv (means and CIs) · results/E*_days.csv (per day)</td></tr>
+<tr><td>AnyLogic</td><td class="m">anylogic/ANYLOGIC_BUILD_GUIDE.md · data/anylogic_inputs.xlsx (after the experiments finish)</td></tr>
+</table></div>
+</div>
