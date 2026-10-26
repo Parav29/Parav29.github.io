@@ -1,0 +1,27 @@
+parameter,distribution,mean,source,status
+arrival_dev,"Triangular(-30, 0, 30)",0.0,"S1,S12,S13",Placeholder
+registration,"Triangular(5, 10, 15)",10.0,"S1,S2",Assumed
+blood_draw,"Triangular(5, 7.5, 10)",7.5,"S1,S2",Assumed
+lab,"Triangular(60, 90, 120)",90.0,"S1,S2,S9",Assumed
+doctor,"Triangular(10, 15, 20)",15.0,"S1,S2,S7",Assumed
+billing,"Triangular(30, 45, 60)",45.0,"S1,S2",Assumed
+pharmacy,"Triangular(15, 22.5, 30)",22.5,"S1,S2,S14,S15",Assumed
+line_premed,"Triangular(20, 30, 40)",30.0,"S1,S2,S4",Assumed
+takedown,"Triangular(5, 10, 15)",10.0,S6,Assumed
+discharge,"Triangular(15, 22.5, 30)",22.5,S1,Assumed
+lab (TMH scenario),"Triangular(120, 180, 240)",180.0,S9,Borrowed
+planned infusion mix,30 min: 25/55; 60 min: 3/55; 120 min: 10/55; 180 min: 10/55; 240 min: 6/55; 360 min: 1/55,104.18,"S10,S4",Borrowed
+actual/planned infusion (short),"Triangular(0.9, 1, 1.6)",1.167,"S11,S16,S17",Assumed
+actual/planned infusion (mid),"Triangular(0.85, 1, 1.2)",1.017,"S11,S16,S17",Assumed
+actual/planned infusion (long),"Triangular(0.75, 0.95, 1.1)",0.933,"S11,S16,S17",Assumed
+P(unfit at review),Bernoulli(0.08),0.08,"S18,S19",Borrowed
+P(no-show),Bernoulli(0.05),0.05,"S20,S21",Assumed
+P(pre-cleared) base,Bernoulli(0.3),0.3,"S3,S2",Assumed
+chairs K,20,20,S2,Assumed
+nurses N,8,8,"S5,S22",Assumed
+monitor ratio M,4,4,"S5,S6",Borrowed
+registration desks,2,2,S2,Assumed
+doctors,2,2,S2,Assumed
+pharmacy hoods,3,3,"S14,S15",Assumed
+opening hours,08:00-18:00,,S2,Assumed
+booking load,0.6,0.6,S2,Assumed
