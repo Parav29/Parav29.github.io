@@ -35,25 +35,33 @@ def slots_needed(planned_infusion):
     return SETUP_SLOTS + planned_infusion // SLOT + TAKEDOWN_SLOTS
 
 
-def greedy(pats, unit: Unit, release, order, horizon_extra=240):
+def greedy(pats, unit: Unit, release, order, horizon_extra=240, arrival_caps=None):
     """List scheduling on a 15-min grid, Hesaraki chair and nurse limits.
 
     Nurse units: a setup or takedown slot uses M units, an infusion slot 1;
-    the total in any slot is at most M*N.  Returns slot start (minutes).
+    the total in any slot is at most M*N.  arrival_caps = (all, same-day) caps
+    told arrivals per slot (constraint C7).  Returns slot start (minutes).
     """
     M, U, K = unit.monitor_ratio, unit.nurse_units, unit.chairs
     T = (unit.close - unit.open + horizon_extra) // SLOT
     chairs = np.zeros(T, int)
     units = np.zeros(T, int)
+    told_all = np.zeros(T, int)
+    told_s = np.zeros(T, int)
     start = {}
     for i in order:
         L = slots_needed(int(pats.loc[i, "planned_infusion"]))
         prof = np.r_[np.full(SETUP_SLOTS, M), np.ones(L - SETUP_SLOTS - TAKEDOWN_SLOTS, int), np.full(TAKEDOWN_SLOTS, M)]
         t0 = max(0, math.ceil((release[i] - unit.open) / SLOT))
         for t in range(t0, T - L + 1):
+            a, same = t - t0, pats.loc[i, "cls"] == "S"
+            if arrival_caps and (told_all[a] >= arrival_caps[0] or (same and told_s[a] >= arrival_caps[1])):
+                continue
             if (chairs[t:t + L] < K).all() and (units[t:t + L] + prof <= U).all():
                 chairs[t:t + L] += 1
                 units[t:t + L] += prof
+                told_all[a] += 1
+                told_s[a] += same
                 start[i] = unit.open + t * SLOT
                 break
         else:   # no room even in overtime: put at the end of the horizon

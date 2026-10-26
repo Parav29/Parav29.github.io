@@ -85,7 +85,7 @@ def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_m
             prob += pulp.lpSum(chair) <= K * z[tau]                           # (2) chairs, only while open
             prob += pulp.lpSum(nurse) <= U                                    # (3) nurses
 
-    cap = None
+    cap, arr_caps = None, None
     if pharmacy_cap:                                                           # (4) pharmacy smoothing
         win = max(1, math.ceil(STAGES["pharmacy"].mean / SLOT))
         cap = math.floor(unit.pharmacy_hoods * win * SLOT / STAGES["pharmacy"].mean)
@@ -99,6 +99,7 @@ def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_m
         # registration desks (everyone) and the doctors (same-day patients only) can serve.
         cap_all = math.floor(unit.registration_desks * SLOT / STAGES["registration"].mean)
         cap_s = math.floor(unit.doctors * SLOT / STAGES["doctor"].mean)
+        arr_caps = (cap_all, cap_s)
         for a in range(T):
             told_all = [y[g, t] for g in groups for t in feas[g] if t - r[g] == a]
             told_s = [y[g, t] for g in groups for t in feas[g] if t - r[g] == a and g[0] == "S"]
@@ -118,7 +119,7 @@ def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_m
     for _ in range(n_starts):
         noise = {i: rng.normal(0, 60) for i in pats.index}
         orders.append(sorted(pats.index, key=lambda i: release[i] - plen[i] + noise[i]))
-    g0 = min((greedy(pats, unit, release, o, horizon_extra) for o in orders), key=score)
+    g0 = min((greedy(pats, unit, release, o, horizon_extra, arr_caps) for o in orders), key=score)
     for v in y.values():
         v.setInitialValue(0)
     last = 0
@@ -138,7 +139,9 @@ def solve_template(pats, unit: Unit, release, horizon_extra=240, w_flow=1.0, w_m
         # longest-waiting-first is irrelevant inside a group: members are identical
         for i, t in zip(members[g], starts):
             slot[i] = unit.open + SLOT * t
-    assert len(slot) == n, "MIP returned an incomplete schedule"
-    return dict(slot=pd.Series(slot), status=pulp.LpStatus[status], objective=pulp.value(prob.objective),
+    status_txt = pulp.LpStatus[status]
+    if len(slot) != n:          # time limit hit before any integer solution: keep the greedy start
+        slot, status_txt = g0.to_dict(), "greedy-fallback"
+    return dict(slot=pd.Series(slot), status=status_txt, objective=pulp.value(prob.objective),
                 cmax=unit.open + SLOT * pulp.value(cmax), overtime=SLOT * pulp.value(over), n_vars=len(y) + len(z),
                 n_cons=len(prob.constraints), pharmacy_cap=cap)
