@@ -316,15 +316,71 @@ Level 3  Daily slots    chair slot s_i per patient time-indexed integer programm
 </ul>
 </div>
 
-<h3>Still running</h3>
-<div class="pending">
+<h3>E4: does it survive wrong inputs?</h3>
+<div class="col"><p>The plan is made with the base inputs, but the simulated days use different ones. This tests what happens when our assumptions about Indian stage times are wrong.</p></div>
+<div class="tbl"><table>
+<tr><th>Reality differs from plan</th><th class="num">Wait, 08:00 rule</th><th class="num">Wait, MIP</th><th class="num">Overtime, 08:00 rule</th><th class="num">Overtime, MIP</th></tr>
+<tr><td>As planned</td><td class="num">316</td><td class="num">213</td><td class="num">127</td><td class="num">37</td></tr>
+<tr><td>Stage-time spread halved</td><td class="num">316</td><td class="num">211</td><td class="num">126</td><td class="num">30</td></tr>
+<tr><td>Stage-time spread doubled</td><td class="num">314</td><td class="num">214</td><td class="num">125</td><td class="num">55</td></tr>
+<tr><td>Lateness halved</td><td class="num">327</td><td class="num">219</td><td class="num">138</td><td class="num">39</td></tr>
+<tr><td>Lateness doubled</td><td class="num">294</td><td class="num">206</td><td class="num">106</td><td class="num">42</td></tr>
+<tr class="hl"><td>Lab takes 2–4 h (TMH hemogram)</td><td class="num">361</td><td class="num">276</td><td class="num">184</td><td class="num">137</td></tr>
+</table></div>
+<figure><img src="results/figures/E4_robust.png" alt="Paired bars of wait and overtime under six input scenarios for the 08:00 rule and the MIP"><figcaption>The plan is made with the base inputs; the simulated reality differs. Bars show 95% confidence intervals.</figcaption></figure>
+<div class="col">
 <ul>
-  <li><b>E4:</b> stage spreads and lateness halved and doubled, and a 2–4 h lab as at TMH.</li>
-  <li><b>E5:</b> which fix buys the most: +2 nurses, +4 chairs, +1 hood, +1 doctor, +1 desk, pre-compounding, pharmacy cap, and the 80% load.</li>
-  <li><b>E6:</b> chairs × nurses grid for the capacity problem from Presentation 1.</li>
+  <li><b>The ranking never changes.</b> The two-time MIP beats "everyone at 08:00" on both wait and overtime in every scenario.</li>
+  <li><b>Doubling the spread costs about 18 extra minutes of overtime</b> (37 → 55). The 80% buffer is computed for the assumed spread, so it covers fewer patients when reality is noisier.</li>
+  <li><b>A slow lab is the real danger.</b> With a 2–4 h hemogram, as TMH states, overtime under the MIP rises to 137 min. At TMH, same-day patients would need a longer buffer, or pre-clearance becomes essential. This is the first thing to measure on the field visit.</li>
 </ul>
-<p>This page will be updated when they finish.</p>
 </div>
+
+<h3>E5: which fix buys the most?</h3>
+<div class="tbl"><table>
+<tr><th>Change (MIP schedule, 30% pre-cleared unless stated)</th><th class="num">Mean wait</th><th class="num">P90 wait</th><th class="num">Overtime</th><th>Effect</th></tr>
+<tr><td>Base</td><td class="num">213</td><td class="num">267</td><td class="num">37</td><td></td></tr>
+<tr class="hl"><td>Pre-clear 60% + pre-compound drugs for them</td><td class="num">157</td><td class="num">252</td><td class="num">10</td><td class="pass">best</td></tr>
+<tr><td>Pre-clear 60%</td><td class="num">178</td><td class="num">260</td><td class="num">15</td><td class="pass">large</td></tr>
+<tr><td>+1 registration desk</td><td class="num">201</td><td class="num">250</td><td class="num">25</td><td class="pass">best single resource</td></tr>
+<tr><td>+1 doctor</td><td class="num">209</td><td class="num">261</td><td class="num">30</td><td class="pass">small</td></tr>
+<tr><td>Pharmacy smoothing cap (C6)</td><td class="num">203</td><td class="num">254</td><td class="num">37</td><td class="pass">wait only</td></tr>
+<tr><td>+1 pharmacy hood</td><td class="num">210</td><td class="num">264</td><td class="num">34</td><td>none significant</td></tr>
+<tr><td>Pre-compound only (30% pre-cleared)</td><td class="num">205</td><td class="num">266</td><td class="num">36</td><td>wait only</td></tr>
+<tr><td>+4 chairs</td><td class="num">214</td><td class="num">268</td><td class="num">38</td><td>none</td></tr>
+<tr><td>+2 nurses</td><td class="num">235</td><td class="num">301</td><td class="num">52</td><td class="note">worse; see below</td></tr>
+<tr><td>Presentation 3 load (80%)</td><td class="num">207</td><td class="num">260</td><td class="num">156</td><td class="note">infeasible</td></tr>
+<tr><td>80% load + pre-clear 60% + 2 nurses</td><td class="num">202</td><td class="num">297</td><td class="num">87</td><td class="note">still 1.5 h overtime</td></tr>
+</table></div>
+<figure><img src="results/figures/E5_fixes.png" alt="Bar charts of overtime and 90th-percentile wait for twelve interventions"><figcaption>Dashed line = base case. Bars show 95% confidence intervals over 100 days.</figcaption></figure>
+<div class="col">
+<ul>
+  <li><b>Process changes beat extra capacity.</b> Pre-clearing 60% and pre-compounding their drugs cuts overtime from 37 to 10 min and mean wait from 213 to 157 min, with no new staff or chairs.</li>
+  <li><b>More chairs do nothing</b>, because chairs are not the constraint.</li>
+  <li><b>A third registration desk is the best single resource</b> to add.</li>
+  <li><b>More nurses made things worse.</b> This is a finding about our formulation, not about nurses. The MIP models chairs and nurses but not the front desk. With 10 nurses it packs more patients into the earliest slots, so more people are told the same arrival time. The registration queue doubles (13 → 28 min) and so does the doctor queue (10 → 20 min). Patients then miss their slots and the day runs late. The bottleneck moves to the front desk. Constraint C7 (below) addresses this.</li>
+</ul>
+</div>
+
+<h3>E6: how many chairs and nurses? (40 days per cell)</h3>
+<div class="tbl"><table>
+<tr><th>Chairs \ Nurses</th><th class="num">6</th><th class="num">8</th><th class="num">10</th><th class="num">12</th></tr>
+<tr><td>16</td><td class="num">158 / 244</td><td class="num">47 / 261</td><td class="num">71 / 288</td><td class="num">76 / 294</td></tr>
+<tr><td>20</td><td class="num">156 / 244</td><td class="num"><b>32 / 266</b></td><td class="num">50 / 300</td><td class="num">65 / 323</td></tr>
+<tr><td>24</td><td class="num">156 / 244</td><td class="num">35 / 268</td><td class="num">28 / 303</td><td class="num">42 / 328</td></tr>
+</table></div>
+<div class="col"><p>Each cell shows overtime / 90th-percentile wait, in minutes.</p></div>
+<figure><img src="results/figures/E6_capacity.png" alt="Overtime and P90 wait against nurses for 16, 20 and 24 chairs"><figcaption>Overtime and 90th-percentile wait by staffing level. Bars show 95% confidence intervals over 40 days per point.</figcaption></figure>
+<div class="col">
+<ul>
+  <li><b>Six nurses is too few at any chair count:</b> about 2.5 h of overtime every day.</li>
+  <li><b>Eight nurses is the cheapest acceptable level.</b> With 20 chairs it gives 32 min overtime. Cutting to 16 chairs adds about 15 min. With the placeholder costs (nurse ₹2,000/day, chair ₹150/day, overtime ₹375/nurse-hour), 20 chairs and 8 nurses is the cheapest cell with overtime under 45 min.</li>
+  <li><b>Beyond 8 nurses, the same bunching problem as in E5 appears</b>, so these columns understate what extra nurses could do. E7 reruns this grid with C7.</li>
+</ul>
+</div>
+
+<h3 id="e7">E7: arrival smoothing (constraint C7)</h3>
+<div class="pending"><p>Running. C7 caps told arrivals per 15 minutes at what the registration desks (3 per 15 min) and doctors (2 same-day per 15 min) can serve. E7 reruns the E5 fixes and the E6 grid with it. This section will be filled in when it finishes.</p></div>
 
 <h2><span class="n">8</span>Assumptions to review</h2>
 <div class="col">
