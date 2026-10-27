@@ -1,0 +1,1611 @@
+<title>INFUCINQ Day-Unit Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a clinic control room. Sticky header with tabs; left rail of controls, right stage
+   with the ward floor (canvas), scorecard and bottleneck charts. Palette carried over from the
+   team's INFUCINQ decks: roasted brown ink, peach paper, rust accent. */
+:root {
+  --bg: #faf1e8;
+  --panel: #fffaf5;
+  --panel-2: #f6e6d7;
+  --ink: #3b2417;
+  --ink-2: #6e4e3c;
+  --muted: #927362;
+  --line: #ead4c1;
+  --line-2: #dcbfa8;
+  --accent: #b4481f;
+  --accent-ink: #fffaf5;
+  --accent-soft: #f7d9c2;
+  --pre: #2a78d6;
+  --same: #eb6834;
+  --st-setup: #6250d6;
+  --st-inf: #1baf7a;
+  --st-block: #d03b3b;
+  --st-td: #eda100;
+  --st-obs: #b59a87;
+  --good: #0ca30c;
+  --warn: #fab219;
+  --crit: #d03b3b;
+  --good-ink: #136b13;
+  --warn-ink: #8a5a00;
+  --crit-ink: #a62626;
+  --q-reg: #2a78d6;
+  --q-doc: #1baf7a;
+  --q-pharm: #eda100;
+  --q-chair: #6250d6;
+  --q-blood: #e87ba4;
+  --heat-0: #fbeee3;
+  --heat-1: #7a2a10;
+  --shadow: 0 1px 0 rgba(59,36,23,.04), 0 8px 24px -12px rgba(59,36,23,.18);
+  --f-display: "Bricolage Grotesque", "Trebuchet MS", system-ui, sans-serif;
+  --f-body: "Atkinson Hyperlegible", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #1f140d; --panel: #2a1c13; --panel-2: #33231a; --ink: #f8e9dc; --ink-2: #dcc0ab; --muted: #b0907b;
+    --line: #47311f; --line-2: #5a3f2b; --accent: #ef9a62; --accent-ink: #24170f; --accent-soft: #4a2c1a;
+    --pre: #3987e5; --same: #d95926; --st-setup: #9085e9; --st-inf: #199e70; --st-block: #e66767; --st-td: #c98500; --st-obs: #7d6555;
+    --good-ink: #5fd35f; --warn-ink: #fab219; --crit-ink: #f08080;
+    --q-reg: #3987e5; --q-doc: #199e70; --q-pharm: #c98500; --q-chair: #9085e9; --q-blood: #d55181;
+    --heat-0: #33231a; --heat-1: #f2a46e;
+    --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 28px -14px rgba(0,0,0,.6);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #1f140d; --panel: #2a1c13; --panel-2: #33231a; --ink: #f8e9dc; --ink-2: #dcc0ab; --muted: #b0907b;
+  --line: #47311f; --line-2: #5a3f2b; --accent: #ef9a62; --accent-ink: #24170f; --accent-soft: #4a2c1a;
+  --pre: #3987e5; --same: #d95926; --st-setup: #9085e9; --st-inf: #199e70; --st-block: #e66767; --st-td: #c98500; --st-obs: #7d6555;
+  --good-ink: #5fd35f; --warn-ink: #fab219; --crit-ink: #f08080;
+  --q-reg: #3987e5; --q-doc: #199e70; --q-pharm: #c98500; --q-chair: #9085e9; --q-blood: #d55181;
+  --heat-0: #33231a; --heat-1: #f2a46e;
+  --shadow: 0 1px 0 rgba(0,0,0,.2), 0 10px 28px -14px rgba(0,0,0,.6);
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+html, body { background: var(--bg); color: var(--ink); }
+body { font-family: var(--f-body); font-size: 14px; line-height: 1.45; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--ink); }
+h1, h2, h3 { font-family: var(--f-display); text-wrap: balance; margin: 0; letter-spacing: -0.01em; }
+.num, .mono { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+button, select, input { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+
+/* Header */
+.top { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 20; background: var(--ink); color: var(--bg);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 10px; }
+.top-inner { max-width: 1480px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: center; justify-content: space-between; }
+.brand { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.brand h1 { font-size: 20px; font-weight: 800; text-transform: uppercase; letter-spacing: .02em; }
+.brand h1 em { font-style: normal; color: #f2a46e; }
+.brand .sub { font-size: 12px; color: #d8bba5; }
+.tabs { display: flex; gap: 4px; background: rgba(255,255,255,.07); padding: 3px; border-radius: 999px; }
+.tabs button { border: 0; background: transparent; color: #e9d2c0; padding: 6px 14px; border-radius: 999px; cursor: pointer; font-weight: 700; font-size: 13px; }
+.tabs button[aria-selected="true"] { background: #f2a46e; color: #24170f; }
+
+.wrap { max-width: 1480px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 18px 48px; }
+.view[hidden] { display: none !important; }
+.grid-main { display: grid; grid-template-columns: 300px minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 980px) { .grid-main { grid-template-columns: minmax(0, 1fr); } }
+
+/* Control rail */
+.rail { display: flex; flex-direction: column; gap: 10px; position: sticky; top: calc(env(safe-area-inset-top, 0px) + 64px); max-height: calc(100vh - 80px); overflow: auto; padding-right: 4px; }
+@media (max-width: 980px) { .rail { position: static; max-height: none; } }
+details.grp { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); }
+details.grp > summary { list-style: none; cursor: pointer; padding: 10px 12px; font-family: var(--f-display); font-weight: 700; font-size: 14px; display: flex; justify-content: space-between; align-items: center; }
+details.grp > summary::-webkit-details-marker { display: none; }
+details.grp > summary::after { content: "+"; color: var(--muted); font-family: var(--f-mono); }
+details.grp[open] > summary::after { content: "–"; }
+.grp-body { padding: 0 12px 12px; display: flex; flex-direction: column; gap: 10px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field > label, .lbl { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); font-weight: 700; display: flex; justify-content: space-between; gap: 8px; }
+.field > label output { font-family: var(--f-mono); color: var(--ink); text-transform: none; letter-spacing: 0; font-weight: 600; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.row3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+select, input[type="number"], input[type="text"] { width: 100%; background: var(--bg); border: 1px solid var(--line-2); border-radius: 7px; padding: 6px 8px; font-size: 13px; }
+input[type="range"] { width: 100%; accent-color: var(--accent); }
+.chk { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; cursor: pointer; }
+.chk input { margin-top: 3px; accent-color: var(--accent); }
+.hint { font-size: 12px; color: var(--muted); }
+.stage-tbl { width: 100%; border-collapse: collapse; font-size: 12px; }
+.stage-tbl th { font-size: 10px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); text-align: left; padding: 2px 2px 4px; font-weight: 700; }
+.stage-tbl td { padding: 2px; }
+.stage-tbl td:first-child { white-space: nowrap; padding-right: 4px; }
+.stage-tbl input { padding: 3px 4px; font-family: var(--f-mono); font-size: 12px; text-align: right; }
+.btn { border: 1px solid var(--line-2); background: var(--panel); border-radius: 8px; padding: 7px 12px; cursor: pointer; font-weight: 700; font-size: 13px; display: inline-flex; align-items: center; gap: 6px; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+.btn.primary:hover { filter: brightness(1.06); }
+.btn:disabled { opacity: .55; cursor: progress; }
+
+/* Stage */
+.stage { display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; box-shadow: var(--shadow); min-width: 0; }
+.card-h { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; padding: 14px 16px 8px; }
+.card-h h2 { font-size: 18px; font-weight: 700; }
+.card-h .sub { color: var(--muted); font-size: 12.5px; max-width: 70ch; }
+.card-b { padding: 4px 16px 16px; min-width: 0; }
+.eyebrow { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: var(--accent); font-weight: 700; }
+
+.floor-wrap { position: relative; }
+#floor { display: block; width: 100%; border-radius: 10px; background: var(--panel-2); }
+.player { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: center; padding: 10px 16px 14px; border-top: 1px solid var(--line); }
+.clock { font-family: var(--f-mono); font-size: 26px; font-weight: 600; min-width: 4.2ch; }
+.player .scrub { flex: 1 1 220px; min-width: 160px; }
+.seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: transparent; padding: 5px 9px; cursor: pointer; font-family: var(--f-mono); font-size: 12px; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
+.legend { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--ink-2); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.sw { width: 11px; height: 11px; border-radius: 3px; display: inline-block; }
+.sw.dot { border-radius: 50%; }
+.live { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 8px; padding: 0 16px 14px; }
+.live div { background: var(--panel-2); border-radius: 8px; padding: 6px 10px; }
+.live b { display: block; font-family: var(--f-mono); font-size: 18px; }
+.live small { font-size: 11px; color: var(--ink-2); text-transform: uppercase; letter-spacing: .05em; }
+
+/* KPI tiles */
+.kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+.kpi { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--bg); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kpi .k { font-size: 11px; text-transform: uppercase; letter-spacing: .06em; color: var(--ink-2); font-weight: 700; display: flex; justify-content: space-between; gap: 6px; align-items: center; }
+.kpi .v { font-family: var(--f-mono); font-size: 24px; font-weight: 600; line-height: 1.15; }
+.kpi .v small { font-size: 13px; color: var(--ink-2); font-weight: 400; }
+.kpi .d { font-size: 12px; color: var(--muted); }
+.kpi .ci { font-family: var(--f-mono); font-size: 11.5px; color: var(--ink-2); border-top: 1px dashed var(--line); margin-top: 4px; padding-top: 4px; min-height: 1.4em; }
+.pill { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; border-radius: 999px; padding: 1px 7px; font-weight: 700; display: inline-flex; align-items: center; gap: 4px; white-space: nowrap; }
+.pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.pill.good { color: var(--good-ink); background: color-mix(in srgb, var(--good) 14%, transparent); }
+.pill.warn { color: var(--warn-ink); background: color-mix(in srgb, var(--warn) 20%, transparent); }
+.pill.crit { color: var(--crit-ink); background: color-mix(in srgb, var(--crit) 15%, transparent); }
+
+.two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 1100px) { .two { grid-template-columns: minmax(0, 1fr); } }
+.verdict { background: var(--ink); color: var(--bg); border-radius: 10px; padding: 12px 14px; font-size: 14px; }
+.verdict b { color: #f2a46e; font-family: var(--f-display); font-size: 16px; display: block; margin-bottom: 2px; }
+.rank { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.rank li { display: grid; grid-template-columns: 130px minmax(0, 1fr) 64px; gap: 8px; align-items: center; font-size: 12.5px; }
+.rank .bar { height: 14px; background: var(--panel-2); border-radius: 4px; position: relative; overflow: hidden; display: flex; gap: 2px; }
+.rank .bar i { display: block; height: 100%; }
+.rank .bar i:last-child { border-radius: 0 4px 4px 0; }
+.rank .val { font-family: var(--f-mono); text-align: right; }
+.chart { width: 100%; overflow-x: auto; position: relative; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { fill: var(--ink-2); font-family: var(--f-body); font-size: 11px; }
+.chart .ax line, .chart .grid line { stroke: var(--line); }
+.chart .ax path { stroke: var(--line-2); }
+.chart .nowline { stroke: var(--accent); stroke-width: 1.5; stroke-dasharray: 3 3; }
+.tip { position: fixed; z-index: 50; pointer-events: none; background: var(--ink); color: var(--bg); border-radius: 8px; padding: 7px 9px; font-size: 12px; line-height: 1.35; max-width: 260px; box-shadow: var(--shadow); }
+.tip b { font-family: var(--f-mono); }
+.tip[hidden] { display: none; }
+.tbl-wrap { overflow-x: auto; }
+table.data { border-collapse: collapse; width: 100%; font-size: 12.5px; }
+table.data th, table.data td { text-align: right; padding: 6px 8px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+table.data th:first-child, table.data td:first-child { text-align: left; }
+table.data th { font-size: 10.5px; text-transform: uppercase; letter-spacing: .05em; color: var(--ink-2); }
+table.data td { font-family: var(--f-mono); font-variant-numeric: tabular-nums; }
+table.data td:first-child { font-family: var(--f-body); }
+table.data tr.best td { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.progress { height: 4px; background: var(--panel-2); border-radius: 99px; overflow: hidden; flex: 1 1 120px; }
+.progress i { display: block; height: 100%; width: 0; background: var(--accent); transition: width .1s; }
+.exp-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 18px; }
+@media (max-width: 1100px) { .exp-grid { grid-template-columns: minmax(0, 1fr); } }
+.exp-grid .wide { grid-column: 1 / -1; }
+.exp-ctl { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; }
+.finding { border-left: 3px solid var(--accent); padding: 6px 10px; background: var(--panel-2); border-radius: 0 8px 8px 0; font-size: 13px; margin-top: 10px; }
+.minis { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 14px; }
+.mini h3 { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.prose { max-width: 75ch; }
+.prose p, .prose li { color: var(--ink-2); }
+.prose h3 { font-size: 16px; margin: 18px 0 6px; color: var(--ink); }
+.tag { font-size: 10.5px; padding: 1px 7px; border-radius: 99px; border: 1px solid var(--line-2); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.tag.assumed { color: var(--warn-ink); }
+.tag.borrowed { color: var(--pre); }
+.tag.placeholder { color: var(--crit-ink); }
+.tag.measured { color: var(--good-ink); }
+.papers { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.paper { border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+.paper h3 { font-size: 14px; }
+.paper .yr { font-family: var(--f-mono); color: var(--accent); font-size: 12px; }
+.paper p { font-size: 13px; color: var(--ink-2); margin: 6px 0; }
+.paper .use { font-size: 12.5px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.paper a { color: var(--accent); }
+.formula { font-family: var(--f-mono); background: var(--panel-2); border-radius: 8px; padding: 10px 12px; font-size: 13px; overflow-x: auto; white-space: pre; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="top">
+  <div class="top-inner">
+    <div class="brand">
+      <h1>Day-care <em>chemo</em> unit simulator</h1>
+      <span class="sub">IE301 · Team INFUCINQ · discrete-event model of the 10-step patient flow</span>
+    </div>
+    <nav class="tabs" role="tablist" aria-label="Views">
+      <button role="tab" id="tab-live" aria-selected="true" data-view="live">Live day</button>
+      <button role="tab" id="tab-exp" aria-selected="false" data-view="exp">Experiments</button>
+      <button role="tab" id="tab-model" aria-selected="false" data-view="model">Model &amp; sources</button>
+    </nav>
+  </div>
+</header>
+
+<main class="wrap">
+<!-- ================= LIVE DAY ================= -->
+<section class="view" id="view-live">
+<div class="grid-main">
+  <aside class="rail" aria-label="Scenario controls">
+    <details class="grp" open>
+      <summary>Scenario</summary>
+      <div class="grp-body">
+        <div class="field"><label for="preset">Preset</label>
+          <select id="preset">
+            <option value="base">P3 base case · 20 chairs, 80% booked</option>
+            <option value="feasible">Lighter book · 60% of chair-hours</option>
+            <option value="sanity">Sanity check · all at 8 am, none pre-cleared</option>
+            <option value="kochi3">Kochi phase III · phone triage + pre-made orders</option>
+            <option value="tmh">TMH-scale · 75 chairs, 18 nurses</option>
+            <option value="custom" hidden>Custom</option>
+          </select>
+        </div>
+        <div class="field"><label for="rule">Booking rule</label>
+          <select id="rule"></select>
+          <span class="hint" id="rule-desc"></span>
+        </div>
+        <div class="field" id="q-field"><label for="q">Buffer covers q of patients <output id="q-out"></output></label>
+          <input type="range" id="q" min="0.5" max="0.95" step="0.05">
+        </div>
+        <div class="field"><label for="preCleared">Pre-cleared the day before <output id="preCleared-out"></output></label>
+          <input type="range" id="preCleared" min="0" max="1" step="0.05">
+        </div>
+        <div class="row2">
+          <div class="field"><label for="seed">Day #</label><input type="number" id="seed" min="1" max="99999" step="1"></div>
+          <div class="field"><label>&nbsp;</label><button class="btn" id="newday" type="button">New random day</button></div>
+        </div>
+      </div>
+    </details>
+    <details class="grp" open>
+      <summary>Unit resources</summary>
+      <div class="grp-body">
+        <div class="row3">
+          <div class="field"><label for="chairs">Chairs K</label><input type="number" id="chairs" min="2" max="120"></div>
+          <div class="field"><label for="nurses">Nurses N</label><input type="number" id="nurses" min="1" max="40"></div>
+          <div class="field"><label for="monitor">Monitor M</label><input type="number" id="monitor" min="1" max="8"></div>
+        </div>
+        <div class="row3">
+          <div class="field"><label for="open">Opens</label><select id="open"></select></div>
+          <div class="field"><label for="close">Closes</label><select id="close"></select></div>
+          <div class="field"><label for="maxOT">Max OT min</label><input type="number" id="maxOT" min="0" max="360" step="15"></div>
+        </div>
+        <span class="hint">One nurse sets up or takes down 1 patient, or monitors up to M on the drip (Hesaraki 2019). A patient who cannot finish by closing + max overtime is sent home.</span>
+      </div>
+    </details>
+    <details class="grp">
+      <summary>Patients &amp; demand</summary>
+      <div class="grp-body">
+        <div class="field"><label for="fill">Booked share of chair-hours <output id="fill-out"></output></label><input type="range" id="fill" min="0.3" max="1.1" step="0.05"></div>
+        <div class="row2">
+          <div class="field"><label for="unfit">Unfit at review %</label><input type="number" id="unfit" min="0" max="50" step="1"></div>
+          <div class="field"><label for="noShow">No-show %</label><input type="number" id="noShow" min="0" max="40" step="1"></div>
+        </div>
+        <div class="lbl">Infusion-length mix</div>
+        <table class="stage-tbl" id="mix-tbl"></table>
+      </div>
+    </details>
+    <details class="grp">
+      <summary>Stage times (minutes)</summary>
+      <div class="grp-body">
+        <table class="stage-tbl" id="stage-tbl"></table>
+        <span class="hint">Triangular(low, mode, high). Capacity 0 means no queue: a pure delay the unit does not control (lab turnaround, insurance approval).</span>
+      </div>
+    </details>
+    <details class="grp">
+      <summary>Uncertainty &amp; day-of rules</summary>
+      <div class="grp-body">
+        <div class="field"><label for="spread">Stage-time spread × <output id="spread-out"></output></label><input type="range" id="spread" min="0.25" max="3" step="0.25"></div>
+        <div class="row2">
+          <div class="field"><label for="devEarly">Up to min early</label><input type="number" id="devEarly" min="0" max="120" step="5"></div>
+          <div class="field"><label for="devLate">Up to min late</label><input type="number" id="devLate" min="0" max="180" step="5"></div>
+        </div>
+        <div class="field"><label for="devMult">Lateness spread × <output id="devMult-out"></output></label><input type="range" id="devMult" min="0" max="3" step="0.25"></div>
+        <div class="field"><label for="templateOrder">Template order</label>
+          <select id="templateOrder">
+            <option value="lpt">Longest infusion first (Kochi phase III)</option>
+            <option value="spt">Shortest infusion first</option>
+            <option value="same_first">Same-day patients first</option>
+            <option value="none">Booking order</option>
+          </select></div>
+        <label class="chk"><input type="checkbox" id="allowEarly"> Ready early: start before the slot if a chair and nurse are free</label>
+        <label class="chk"><input type="checkbox" id="precompound"> Pre-cleared drugs compounded before arrival</label>
+        <label class="chk"><input type="checkbox" id="takedownFirst"> Nurses take down finished drips before new setups</label>
+      </div>
+    </details>
+    <details class="grp">
+      <summary>Scorecard weights</summary>
+      <div class="grp-body">
+        <div class="row2">
+          <div class="field"><label for="wWait">Wait / h</label><input type="number" id="wWait" min="0" max="10" step="0.5"></div>
+          <div class="field"><label for="wIdle">Idle chair-h / chair</label><input type="number" id="wIdle" min="0" max="10" step="0.5"></div>
+          <div class="field"><label for="wOT">Overtime / h</label><input type="number" id="wOT" min="0" max="10" step="0.5"></div>
+          <div class="field"><label for="wDef">Per patient sent home</label><input type="number" id="wDef" min="0" max="10" step="0.5"></div>
+        </div>
+        <span class="hint">Cost = w·mean wait (h) + w·idle chair-hours per chair + w·overtime (h) + w·patients deferred for capacity. Used by the buffer tuner.</span>
+      </div>
+    </details>
+  </aside>
+
+  <div class="stage">
+    <article class="card">
+      <div class="card-h">
+        <div>
+          <div class="eyebrow" id="floor-eyebrow">Simulated day</div>
+          <h2>The unit floor, minute by minute</h2>
+        </div>
+        <div class="legend" aria-label="Floor legend">
+          <span><i class="sw dot" style="background:var(--pre)"></i>Pre-cleared</span>
+          <span><i class="sw dot" style="background:var(--same)"></i>Same-day test</span>
+          <span><i class="sw" style="background:var(--st-setup)"></i>Setup</span>
+          <span><i class="sw" style="background:var(--st-inf)"></i>Infusing</span>
+          <span><i class="sw" style="background:var(--st-block)"></i>Done, waiting for nurse</span>
+          <span><i class="sw" style="background:var(--st-td)"></i>Takedown</span>
+          <span><i class="sw" style="background:var(--st-obs)"></i>Observation</span>
+        </div>
+      </div>
+      <div class="floor-wrap"><canvas id="floor" aria-label="Animated floor plan of the day-care unit" role="img"></canvas></div>
+      <div class="player">
+        <button class="btn primary" id="play" type="button" aria-label="Play">▶ Play</button>
+        <span class="clock" id="clock">08:00</span>
+        <input class="scrub" type="range" id="scrub" min="0" max="1000" step="1" aria-label="Time of day">
+        <span class="lbl" style="margin-right:-6px">Speed</span>
+        <div class="seg" id="speed" role="group" aria-label="Playback speed">
+          <button type="button" data-s="10">10×</button><button type="button" data-s="30" aria-pressed="true">30×</button><button type="button" data-s="90">90×</button><button type="button" data-s="240">240×</button>
+        </div>
+      </div>
+      <div class="live" id="live"></div>
+    </article>
+
+    <article class="card">
+      <div class="card-h">
+        <div><div class="eyebrow">Scorecard</div><h2>How this day scored</h2>
+          <div class="sub">Top line: this simulated day. Bottom line: mean ± 95% CI over 100 days on the same random patient days.</div></div>
+        <div class="exp-ctl"><button class="btn" id="rep" type="button">Estimate over 100 days</button><div class="progress" style="width:120px"><i id="rep-prog"></i></div></div>
+      </div>
+      <div class="card-b"><div class="kpis" id="kpis"></div></div>
+    </article>
+
+    <div class="two">
+      <article class="card">
+        <div class="card-h"><div><div class="eyebrow">Bottlenecks</div><h2>Where the waiting comes from</h2>
+          <div class="sub">Average minutes per treated patient at each step. Solid: the work itself. Bright: time spent queuing for a server, chair or nurse.</div></div></div>
+        <div class="card-b">
+          <div class="verdict" id="verdict"></div>
+          <ul class="rank" id="rank"></ul>
+          <div class="legend" style="margin-top:10px"><span><i class="sw" style="background:var(--st-obs)"></i>Service or delay</span><span><i class="sw" style="background:var(--accent)"></i>Queueing</span></div>
+        </div>
+      </article>
+      <article class="card">
+        <div class="card-h"><div><div class="eyebrow">Idle chairs</div><h2>Why chairs sat empty</h2>
+          <div class="sub">Chair-hours inside opening hours, split by cause. Starvation is the ready-time problem: chairs free, patients in the building but not yet cleared.</div></div></div>
+        <div class="card-b"><div class="chart" id="ch-idle"></div><div class="chart" id="ch-heat" style="margin-top:14px"></div></div>
+      </article>
+    </div>
+
+    <div class="two">
+      <article class="card">
+        <div class="card-h"><div><div class="eyebrow">Queues</div><h2>Queue length through the day</h2></div></div>
+        <div class="card-b"><div class="chart" id="ch-queue"></div></div>
+      </article>
+      <article class="card">
+        <div class="card-h"><div><div class="eyebrow">Nurses</div><h2>Nurse load against capacity</h2>
+          <div class="sub">Load = setups + takedowns + drips ÷ M, over N nurses. Peaks at the start and end of infusions (Athawale 2015).</div></div></div>
+        <div class="card-b"><div class="chart" id="ch-nurse"></div></div>
+      </article>
+    </div>
+
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Core idea</div><h2>Two times per patient: told arrival and ready time</h2>
+        <div class="sub">Delay D from told arrival to ready-for-chair, by class. The buffer B<sub>c</sub> is the q-quantile; the chair slot is told arrival + B<sub>c</sub>.</div></div></div>
+      <div class="card-b"><div class="chart" id="ch-delay"></div></div>
+    </article>
+
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Chairs</div><h2>Chair timeline</h2>
+        <div class="sub">One row per chair. Bar colour shows the patient class; the darker ends are setup and takedown. Ticks mark the planned slot from the booking template.</div></div></div>
+      <div class="card-b"><div class="chart" id="ch-gantt"></div></div>
+    </article>
+  </div>
+</div>
+</section>
+
+<!-- ================= EXPERIMENTS ================= -->
+<section class="view" id="view-exp" hidden>
+  <div class="card" style="margin-bottom:18px">
+    <div class="card-h"><div><div class="eyebrow">Experiments from Presentation 3</div><h2>Four questions, run on identical patient days</h2>
+      <div class="sub">Every scenario uses the current Live-day settings as its base, the same random seeds (common random numbers), and reports mean ± 95% CI.</div></div>
+      <div class="exp-ctl"><label class="lbl" for="exp-days">Days per scenario</label><select id="exp-days" style="width:auto"><option>30</option><option selected>100</option><option>200</option></select>
+        <button class="btn primary" id="run-all" type="button">Run all</button><div class="progress" style="width:160px"><i id="exp-prog"></i></div><span class="hint" id="exp-status"></span></div>
+    </div>
+  </div>
+  <div class="exp-grid">
+    <article class="card wide">
+      <div class="card-h"><div><div class="eyebrow">Sanity check</div><h2>Does the model reproduce the Kochi baseline?</h2>
+        <div class="sub">Nobody pre-cleared, everyone called at 8 am, first-come-first-served. Pavithran et al. (2025) measured a 3.5 h baseline wait at Amrita, Kochi.</div></div>
+        <button class="btn" data-run="sanity" type="button">Run</button></div>
+      <div class="card-b"><div id="out-sanity" class="hint">Not run yet.</div></div>
+    </article>
+    <article class="card wide">
+      <div class="card-h"><div><div class="eyebrow">Experiment 1</div><h2>Does the rule beat simple practice?</h2></div><button class="btn" data-run="e1" type="button">Run</button></div>
+      <div class="card-b"><div id="out-e1" class="hint">Not run yet.</div></div>
+    </article>
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Experiment 2</div><h2>How big should the buffer be?</h2></div><button class="btn" data-run="e2" type="button">Run</button></div>
+      <div class="card-b"><div id="out-e2" class="hint">Not run yet.</div></div>
+    </article>
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Experiment 3</div><h2>How much pre-clearance is enough?</h2></div><button class="btn" data-run="e3" type="button">Run</button></div>
+      <div class="card-b"><div id="out-e3" class="hint">Not run yet.</div></div>
+    </article>
+    <article class="card wide">
+      <div class="card-h"><div><div class="eyebrow">Experiment 4</div><h2>Does it survive wrong inputs?</h2></div><button class="btn" data-run="e4" type="button">Run</button></div>
+      <div class="card-b"><div id="out-e4" class="hint">Not run yet.</div></div>
+    </article>
+    <article class="card wide">
+      <div class="card-h"><div><div class="eyebrow">Outer loop</div><h2>Tune the buffer and find the binding resource</h2>
+        <div class="sub">Grid over q, then one-at-a-time capacity moves: which single extra chair, nurse, clerk, doctor or cabinet buys the most?</div></div><button class="btn" data-run="e5" type="button">Run</button></div>
+      <div class="card-b"><div id="out-e5" class="hint">Not run yet.</div></div>
+    </article>
+  </div>
+</section>
+
+<!-- ================= MODEL ================= -->
+<section class="view" id="view-model" hidden>
+  <div class="two">
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Formulation</div><h2>The rule in symbols</h2></div></div>
+      <div class="card-b prose">
+<div class="formula">decide      a_i (told arrival), s_i (chair slot)  for every patient i
+buffer      s_i = a_i + B_c,   P(D_i ≤ B_c) = q   for class c ∈ {pre-cleared, same-day}
+chairs      patients in chairs at any time ≤ K
+nurses      M·(setups + takedowns) + patients on the drip ≤ M·N
+closing     s_i + L_i ≤ closing time     (else booked into overtime, else standby)
+minimise    w₁·wait + w₂·idle chair time + w₃·overtime + w₄·sent home   (in the simulation)</div>
+        <h3>How the simulator builds a day</h3>
+        <ol>
+          <li><b>Draw the patient list.</b> Patients are drawn until booked chair time reaches the booked share of K × opening hours. Each gets an infusion length from the mix and a set of random numbers for every stage.</li>
+          <li><b>Estimate B<sub>c</sub>.</b> A pilot of 24 separate days is simulated under the rule, the realised delay D = ready − told is collected per class, and B<sub>c</sub> is set to its q-quantile. This repeats twice, so registration and pharmacy queues caused by the rule itself are inside the buffer.</li>
+          <li><b>Build the template.</b> Patients are placed in template order on a 5-minute grid at the earliest time ≥ opening + B<sub>c</sub> where a chair is free and the nurse limit holds through setup, drip and takedown (Hesaraki 2019). Told arrival = slot − B<sub>c</sub>, rounded down to 15 minutes.</li>
+          <li><b>Play the day.</b> Arrivals deviate from the told time. Same-day patients go through registration, blood draw, lab, doctor review (some go home unfit), billing and pharmacy. Pre-cleared patients skip steps 2–4.</li>
+          <li><b>Dispatch chairs.</b> When a chair and a nurse are free, the ready patient with the earliest slot starts (or FCFS / longest / shortest for the 8 am rules). Nurses take down finished drips first; a finished patient waiting for a nurse blocks the chair.</li>
+        </ol>
+        <h3>KPIs and how they are measured</h3>
+        <ul>
+          <li><b>Wait</b>: actual arrival to start of drip, mean and 90th percentile, per class and per infusion length (equity).</li>
+          <li><b>Idle chair-hours</b> inside opening hours, split into starvation (patients still in steps 1–6), nurse-bound (ready patient, no nurse) and no demand.</li>
+          <li><b>Overtime</b>: last patient out minus closing time.</li>
+          <li><b>Not treated on booked day</b>: unfit at review, sent home for capacity, no-shows, and standby patients the template could not fit.</li>
+          <li><b>Nurse saturation</b>: hours in opening time when no nurse could start a new setup.</li>
+          <li><b>Chair blocking</b>: minutes a finished patient sat waiting for a nurse to take the line down.</li>
+        </ul>
+      </div>
+    </article>
+    <article class="card">
+      <div class="card-h"><div><div class="eyebrow">Inputs</div><h2>Every number, with its status</h2>
+        <div class="sub">Swap each one when TMH data arrives. Statuses follow Presentation 3, slide 5.</div></div></div>
+      <div class="card-b"><div class="tbl-wrap"><table class="data" id="src-tbl"></table></div>
+        <h3 style="font-size:15px;margin:16px 0 6px">What we still need from TMH</h3>
+        <p class="hint" style="font-size:13px">Time stamps per patient (registration, blood draw, result, clearance, drug ready, chair start, chair end), planned infusion length, booked or walk-in, blood test same day or day before, sent home unfit, chairs and nurses per shift. With those, each <span class="tag assumed">Assumed</span> row becomes a fitted distribution.</p>
+      </div>
+    </article>
+  </div>
+  <article class="card" style="margin-top:18px">
+    <div class="card-h"><div><div class="eyebrow">Literature</div><h2>What each paper gives the simulator</h2></div></div>
+    <div class="card-b"><div class="papers" id="papers"></div></div>
+  </article>
+</section>
+</main>
+<div class="tip" id="tip" hidden></div>
+<script>
+// ===== INFUCINQ day-care chemotherapy discrete-event simulation engine =====
+// Minutes since midnight. Common random numbers: every patient-day is drawn from a seed
+// as uniforms, so every rule, buffer, pre-clearance share and spread is tested on identical days.
+const Engine = (() => {
+  function rng(seed) {
+    let a = seed >>> 0;
+    return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+  }
+  // Triangular inverse CDF, with the spread around the mode scaled by f
+  function tri(u, lo, mode, hi, f = 1) {
+    const a = mode - (mode - lo) * f, b = mode + (hi - mode) * f;
+    if (b <= a) return mode;
+    const c = (mode - a) / (b - a);
+    return u < c ? a + Math.sqrt(u * (b - a) * (mode - a)) : b - Math.sqrt((1 - u) * (b - a) * (b - mode));
+  }
+  const triMean = (s) => (s.lo + s.mode + s.hi) / 3;
+
+  const STAGES = [
+    { key: 'reg', name: 'Registration', step: 1, lo: 5, mode: 10, hi: 15, cap: 3, src: 'Assumed (P3 slide 9)' },
+    { key: 'blood', name: 'Blood draw', step: 2, lo: 5, mode: 7, hi: 10, cap: 4, src: 'Assumed; shared hospital counter (TMH visit)' },
+    { key: 'lab', name: 'Lab result', step: 3, lo: 60, mode: 90, hi: 120, cap: Infinity, src: 'Assumed 60–120; triangular shape borrowed' },
+    { key: 'doc', name: 'Doctor review', step: 4, lo: 10, mode: 15, hi: 20, cap: 4, src: 'Assumed (P3 slide 9)' },
+    { key: 'bill', name: 'Billing, insurance', step: 5, lo: 30, mode: 45, hi: 60, cap: Infinity, src: 'Assumed 30–60; elapsed approval time' },
+    { key: 'pharm', name: 'Drug prepared', step: 6, lo: 15, mode: 22, hi: 30, cap: 3, src: 'Assumed 15–30; compounding cabinets' },
+    { key: 'setup', name: 'Line, pre-meds', step: 8, lo: 20, mode: 30, hi: 40, cap: null, src: 'Assumed; nurse exclusive (Hesaraki 2019)' },
+    { key: 'takedown', name: 'Takedown', step: 10, lo: 5, mode: 7, hi: 10, cap: null, src: 'Nurse exclusive at end (Athawale 2015)' },
+    { key: 'obs', name: 'Observation, discharge', step: 10, lo: 10, mode: 15, hi: 20, cap: null, src: 'Discharge 15–30 total incl. takedown' },
+  ];
+  // Infusion-length mix (minutes, weight). Shape borrowed from published OCC histograms, 30 min – 6 h.
+  const INFUSION_MIX = [
+    { lo: 30, hi: 60, w: 0.22, label: '0.5–1 h' },
+    { lo: 60, hi: 120, w: 0.30, label: '1–2 h' },
+    { lo: 120, hi: 240, w: 0.30, label: '2–4 h' },
+    { lo: 240, hi: 360, w: 0.18, label: '4–6 h' },
+  ];
+
+  const RULES = {
+    at8_fcfs: { name: 'Everyone at 8 am', short: 'All 8 am · FCFS', desc: 'Current practice. All told 08:00; chairs go first-come-first-served on readiness.' },
+    at8_lpt: { name: 'Everyone at 8 am, longest first', short: 'All 8 am · LPT', desc: 'All told 08:00; the longest ready infusion gets the next chair.' },
+    at8_spt: { name: 'Everyone at 8 am, shortest first', short: 'All 8 am · SPT', desc: 'All told 08:00; the shortest ready infusion gets the next chair.' },
+    buckets: { name: 'Duration buckets', short: 'Buckets', desc: 'Long (≥4 h) told 08:00, 2–4 h told 09:00, short told 11:00. Ignores ready time.' },
+    tmpl_mean: { name: 'Template, mean ready time', short: 'Template · mean', desc: 'Hesaraki-style chair & nurse template; told time = slot − mean delay (ready time treated as known).' },
+    buffer: { name: 'Buffer rule (q-quantile)', short: 'Buffer rule', desc: 'Our rule: slot = told arrival + B_c, where B_c covers a share q of class-c patients. Template by Hesaraki chair & nurse limits.' },
+  };
+
+  function defaultParams() {
+    return {
+      chairs: 20, nurses: 6, monitor: 4, open: 480, close: 1080, maxOT: 120,
+      fill: 0.8, preCleared: 0.3, unfit: 0.08, noShow: 0.04,
+      devEarly: 30, devLate: 30, devMult: 1, spread: 1,
+      rule: 'buffer', q: 0.8, templateOrder: 'lpt', allowEarly: true, precompound: false,
+      takedownFirst: true,
+      stages: STAGES.map(s => ({ ...s })),
+      mix: INFUSION_MIX.map(m => ({ ...m })),
+      wWait: 1, wIdle: 1, wOT: 2, wDef: 1,
+    };
+  }
+  const stg = (P, k) => P.stages.find(s => s.key === k);
+
+  // ---- Patient-day generation (uniforms only; transformed later) ----
+  function genDay(P, seed) {
+    const r = rng(seed * 7919 + 17);
+    const target = P.fill * P.chairs * (P.close - P.open);
+    const pts = []; let load = 0; let id = 0;
+    const fixedChair = triMean(stg(P, 'setup')) + triMean(stg(P, 'takedown')) + triMean(stg(P, 'obs'));
+    while (load < target && id < 400) {
+      const um = r(), uL = r();
+      let acc = 0, bin = P.mix[P.mix.length - 1];
+      const tw = P.mix.reduce((a, m) => a + m.w, 0);
+      for (const m of P.mix) { acc += m.w / tw; if (um <= acc) { bin = m; break; } }
+      const L = Math.round(bin.lo + uL * (bin.hi - bin.lo));
+      const u = {}; for (const s of P.stages) u[s.key] = r();
+      pts.push({ id: id++, L, uClass: r(), uDev: r(), uUnfit: r(), uNoShow: r(), u, planned: L + fixedChair });
+      load += L + fixedChair;
+    }
+    return pts;
+  }
+  const dur = (P, k, u) => { const s = stg(P, k); return tri(u, s.lo, s.mode, s.hi, P.spread); };
+
+  // ---- Delay distribution D (told arrival -> ready for chair), Monte Carlo without queues ----
+  function delayQuantiles(P, n = 3000) {
+    const r = rng(99173);
+    const out = { pre: [], same: [] };
+    for (let i = 0; i < n; i++) {
+      const dev = devFrom(P, r());
+      const reg = dur(P, 'reg', r()), bl = dur(P, 'blood', r()), lab = dur(P, 'lab', r()), doc = dur(P, 'doc', r()), bill = dur(P, 'bill', r()), ph = dur(P, 'pharm', r());
+      const devP = Math.max(dev, 0);
+      out.same.push(devP + reg + bl + lab + doc + bill + ph);
+      out.pre.push(devP + reg + bill + (P.precompound ? 0 : ph));
+    }
+    out.pre.sort((a, b) => a - b); out.same.sort((a, b) => a - b);
+    const qf = (arr, q) => arr[Math.min(arr.length - 1, Math.floor(q * arr.length))];
+    const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
+    return { pre: out.pre, same: out.same, B: { pre: qf(out.pre, P.q), same: qf(out.same, P.q) }, mean: { pre: mean(out.pre), same: mean(out.same) }, src: 'no-queue Monte Carlo' };
+  }
+  // B_c from realised delays: pilot days (seeds kept apart from the evaluation days), iterated so
+  // queueing at registration and pharmacy under the rule itself is inside the buffer.
+  function calibrate(P, pilots = 24, iters = 2) {
+    let DQ = delayQuantiles(P);
+    if (P.rule !== 'buffer' && P.rule !== 'tmpl_mean') return DQ;
+    const qf = (arr, q) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(q * arr.length))] : 0;
+    const mean = (arr) => arr.reduce((a, b) => a + b, 0) / Math.max(1, arr.length);
+    for (let it = 0; it < iters; it++) {
+      const D = { pre: [], same: [] };
+      for (let d = 0; d < pilots; d++) {
+        const r = simulate(P, 50000 + d, { DQ });
+        for (const p of r.pts) if (p.ready !== undefined) D[p.cls].push(p.ready - p.told);
+      }
+      D.pre.sort((a, b) => a - b); D.same.sort((a, b) => a - b);
+      const nd = { pre: D.pre.length ? D.pre : DQ.pre, same: D.same.length ? D.same : DQ.same };
+      DQ = { pre: nd.pre, same: nd.same, B: { pre: qf(nd.pre, P.q), same: qf(nd.same, P.q) }, mean: { pre: mean(nd.pre), same: mean(nd.same) }, src: 'pilot simulation' };
+    }
+    return DQ;
+  }
+  function devFrom(P, u) { // uniform between -early and +late, scaled
+    return (-P.devEarly + u * (P.devEarly + P.devLate)) * P.devMult;
+  }
+
+  // ---- Booking rules: told arrival a_i and planned chair slot s_i ----
+  function book(P, pts, DQ) {
+    const isPre = (p) => p.uClass < P.preCleared;
+    const rule = P.rule;
+    pts.forEach(p => { p.cls = isPre(p) ? 'pre' : 'same'; p.slot = null; p.chairPlan = null; p.overflow = false; p.otPlan = false; });
+    if (rule.startsWith('at8')) { pts.forEach(p => { p.told = P.open; }); return; }
+    if (rule === 'buckets') { pts.forEach(p => { p.told = p.L >= 240 ? P.open : p.L >= 120 ? P.open + 60 : P.open + 180; }); return; }
+    // Template (Hesaraki 2019 limits): chairs <= K, M*setups + infusing <= M*N, on a 5-min grid.
+    const B = rule === 'buffer' ? DQ.B : DQ.mean;
+    const G = 5, H0 = P.open, H1 = P.close + P.maxOT + 360;
+    const n = Math.ceil((H1 - H0) / G);
+    const chairFree = Array.from({ length: P.chairs }, () => new Uint8Array(n));
+    const excl = new Float32Array(n), inf = new Float32Array(n);
+    const sM = triMean(stg(P, 'setup')), tM = triMean(stg(P, 'takedown')), oM = triMean(stg(P, 'obs'));
+    const order = pts.slice();
+    if (P.templateOrder === 'lpt') order.sort((a, b) => b.L - a.L);
+    else if (P.templateOrder === 'spt') order.sort((a, b) => a.L - b.L);
+    else if (P.templateOrder === 'same_first') order.sort((a, b) => (a.cls === b.cls ? b.L - a.L : a.cls === 'same' ? -1 : 1));
+    for (const p of order) {
+      const earliest = H0 + B[p.cls];
+      const total = sM + p.L + tM + oM;
+      let placed = false;
+      for (let pass = 0; pass < 2 && !placed; pass++) {
+        for (let t = Math.ceil((earliest - H0) / G); t < n; t++) {
+          const start = H0 + t * G;
+          if (start + total > (pass === 0 ? P.close : P.close + P.maxOT)) break;
+          const i0 = t, iS = t + Math.ceil(sM / G), iI = iS + Math.ceil(p.L / G), iT = iI + Math.ceil(tM / G), iE = iT + Math.ceil(oM / G);
+          if (iE >= n) break;
+          let ok = true;
+          for (let i = i0; i < iS && ok; i++) if (P.monitor * (excl[i] + 1) + inf[i] > P.monitor * P.nurses) ok = false;
+          for (let i = iS; i < iI && ok; i++) if (P.monitor * excl[i] + inf[i] + 1 > P.monitor * P.nurses) ok = false;
+          for (let i = iI; i < iT && ok; i++) if (P.monitor * (excl[i] + 1) + inf[i] > P.monitor * P.nurses) ok = false;
+          if (!ok) continue;
+          let ch = -1;
+          for (let c = 0; c < P.chairs && ch < 0; c++) { let free = true; for (let i = i0; i < iE; i++) if (chairFree[c][i]) { free = false; break; } if (free) ch = c; }
+          if (ch < 0) continue;
+          for (let i = i0; i < iE; i++) chairFree[ch][i] = 1;
+          for (let i = i0; i < iS; i++) excl[i]++;
+          for (let i = iS; i < iI; i++) inf[i]++;
+          for (let i = iI; i < iT; i++) excl[i]++;
+          p.slot = start; p.chairPlan = ch; p.otPlan = pass === 1; placed = true; break;
+        }
+      }
+      if (!placed) { p.slot = null; p.chairPlan = null; p.overflow = true; p.told = P.open; continue; }
+      p.told = Math.max(P.open, Math.floor((p.slot - B[p.cls]) / 15) * 15);
+    }
+  }
+
+  // ---- Event heap ----
+  class Heap { constructor() { this.a = []; this.s = 0; }
+    push(t, fn) { const a = this.a; a.push({ t, s: this.s++, fn }); let i = a.length - 1; while (i > 0) { const j = (i - 1) >> 1; if (lt(a[i], a[j])) { [a[i], a[j]] = [a[j], a[i]]; i = j; } else break; } }
+    pop() { const a = this.a; const top = a[0]; const last = a.pop(); if (a.length) { a[0] = last; let i = 0; for (;;) { const l = 2 * i + 1, r = l + 1; let m = i; if (l < a.length && lt(a[l], a[m])) m = l; if (r < a.length && lt(a[r], a[m])) m = r; if (m === i) break; [a[i], a[m]] = [a[m], a[i]]; i = m; } } return top; }
+    get size() { return this.a.length; } }
+  const lt = (x, y) => x.t < y.t || (x.t === y.t && x.s < y.s);
+
+  // ---- Simulate one day ----
+  function simulate(P, seed, opts = {}) {
+    const trace = !!opts.trace;
+    const pts = genDay(P, seed);
+    const DQ = opts.DQ || calibrate(P);
+    book(P, pts, DQ);
+    const H = new Heap();
+    let now = 0;
+    const hardClose = P.close + P.maxOT;
+    const stations = {};
+    for (const s of P.stages) if (s.cap !== null) stations[s.key] = { key: s.key, cap: s.cap, busy: 0, q: [], busyMin: 0, lastT: P.open, maxQ: 0 };
+    const chairs = Array.from({ length: P.chairs }, (_, i) => ({ i, p: null, state: 'idle' }));
+    let excl = 0, infusing = 0;
+    const readyQ = []; const tdQ = [];
+    let pipeline = 0; // arrived, not yet ready, not left
+    const series = []; // sampled every 5 min
+    const events = trace ? [] : null;
+    const log = (p, zone, extra) => { if (trace) p.tl.push([now, zone, extra ?? null]); };
+    // integrals
+    let lastT = P.open, idleChairMin = 0, occChairMin = 0, starveMin = 0, nurseBoundMin = 0, peakNurse = 0, waitAreaPeak = 0;
+    let nurseLoadInt = 0, nurseSatMin = 0;
+    const freeChairs = () => chairs.filter(c => !c.p).length;
+    function integrate(t) {
+      const a = Math.max(lastT, P.open), b = Math.min(t, P.close);
+      if (b > a) {
+        const fc = freeChairs(), dt = b - a;
+        idleChairMin += fc * dt; occChairMin += (P.chairs - fc) * dt;
+        if (fc > 0 && readyQ.length === 0 && pipeline > 0) starveMin += fc * dt;
+        if (fc > 0 && readyQ.length > 0) nurseBoundMin += fc * dt;
+      }
+      if (b > a && excl + 1 + infusing / P.monitor > P.nurses + 1e-9) nurseSatMin += b - a;
+      if (t > lastT) nurseLoadInt += ((excl + infusing / P.monitor) / P.nurses) * (t - lastT);
+      for (const k in stations) { const st = stations[k]; if (t > st.lastT) { st.busyMin += Math.min(st.busy, st.cap === Infinity ? st.busy : st.cap) * (t - st.lastT); st.lastT = t; } }
+      lastT = Math.max(lastT, t);
+    }
+    function load() { return (excl + infusing / P.monitor) / P.nurses; }
+
+    function serve(key, p, d, next) {
+      const st = stations[key];
+      p.qIn[key] = now;
+      if (st.busy < st.cap) start(st, p, d, next);
+      else { st.q.push({ p, d, next }); st.maxQ = Math.max(st.maxQ, st.q.length); log(p, key, 'queue'); }
+    }
+    function start(st, p, d, next) {
+      st.busy++; p.wq[st.key] = now - p.qIn[st.key]; p.sv[st.key] = d; log(p, st.key, 'serve');
+      H.push(now + d, () => { integrate(now); st.busy--; if (st.q.length) { const n = st.q.shift(); start(st, n.p, n.d, n.next); } next(); });
+    }
+    function leave(p, outcome) { p.outcome = outcome; p.leave = now; if (p.inPipe) { pipeline--; p.inPipe = false; } log(p, outcome === 'treated' ? 'done' : 'home', outcome); }
+
+    for (const p of pts) {
+      p.tl = []; p.wq = {}; p.sv = {}; p.qIn = {}; p.outcome = null; p.inPipe = false;
+      p.d = {}; for (const s of P.stages) p.d[s.key] = dur(P, s.key, p.u[s.key]);
+      p.unfit = p.cls === 'same' && p.uUnfit < P.unfit;
+      p.noShow = p.uNoShow < P.noShow;
+      p.arrive = Math.max(P.open, p.told + devFrom(P, p.uDev));
+      if (p.noShow) { p.outcome = 'noshow'; continue; }
+      H.push(p.arrive, () => arrive(p));
+    }
+    function arrive(p) {
+      integrate(now); pipeline++; p.inPipe = true; log(p, 'arrive');
+      serve('reg', p, p.d.reg, () => {
+        if (p.cls === 'same') serve('blood', p, p.d.blood, () => { p.qIn.lab = now; log(p, 'lab', 'serve'); p.wq.lab = 0; p.sv.lab = p.d.lab;
+          H.push(now + p.d.lab, () => { integrate(now); serve('doc', p, p.d.doc, () => {
+            if (p.unfit) { integrate(now); leave(p, 'unfit'); return; }
+            afterReview(p); }); }); });
+        else afterReview(p);
+      });
+    }
+    function afterReview(p) {
+      p.qIn.bill = now; log(p, 'bill', 'serve'); p.wq.bill = 0; p.sv.bill = p.d.bill;
+      H.push(now + p.d.bill, () => { integrate(now);
+        if (p.cls === 'pre' && P.precompound) { p.wq.pharm = 0; p.sv.pharm = 0; ready(p); }
+        else serve('pharm', p, p.d.pharm, () => { integrate(now); ready(p); }); });
+    }
+    function ready(p) {
+      p.ready = now; if (p.inPipe) { pipeline--; p.inPipe = false; }
+      readyQ.push(p); log(p, 'chairq', 'queue'); dispatch();
+    }
+    const planned = (p) => triMean(stg(P, 'setup')) + p.L + triMean(stg(P, 'takedown')) + triMean(stg(P, 'obs'));
+    function pick() {
+      // remove infeasible (cannot finish by hard close)
+      for (let i = readyQ.length - 1; i >= 0; i--) { const p = readyQ[i]; if (now + planned(p) > hardClose) { readyQ.splice(i, 1); p.wq.chair = now - p.ready; leave(p, 'deferred'); } }
+      let cand = readyQ;
+      if (!P.allowEarly && P.rule !== 'buckets' && !P.rule.startsWith('at8')) cand = readyQ.filter(p => p.slot === null || p.slot <= now);
+      if (!cand.length) return null;
+      let best = cand[0];
+      for (const p of cand) {
+        if (P.rule === 'at8_lpt') { if (p.L > best.L) best = p; }
+        else if (P.rule === 'at8_spt') { if (p.L < best.L) best = p; }
+        else if (P.rule === 'tmpl_mean' || P.rule === 'buffer') { if ((p.slot ?? 1e9) < (best.slot ?? 1e9)) best = p; }
+        // fcfs & buckets: readyQ order is readiness order
+      }
+      return best;
+    }
+    let wakeAt = null;
+    function dispatch() {
+      integrate(now);
+      // Takedowns first (release chairs) if the rule says so
+      const doTD = () => { while (tdQ.length && excl + 1 + infusing / P.monitor <= P.nurses + 1e-9) { const p = tdQ.shift(); startTD(p); } };
+      if (P.takedownFirst) doTD();
+      for (;;) {
+        const c = chairs.find(c => !c.p); if (!c) break;
+        if (excl + 1 + infusing / P.monitor > P.nurses + 1e-9) break;
+        const p = pick(); if (!p) break;
+        readyQ.splice(readyQ.indexOf(p), 1);
+        startSetup(p, c);
+      }
+      if (!P.takedownFirst) doTD();
+      if (!P.allowEarly && readyQ.length && chairs.some(c => !c.p)) {
+        const nxt = Math.min(...readyQ.map(p => p.slot ?? 1e9));
+        if (nxt > now && nxt < 1e9 && wakeAt !== nxt) { wakeAt = nxt; H.push(nxt, () => dispatch()); }
+      }
+      peakNurse = Math.max(peakNurse, load());
+    }
+    function startSetup(p, c) {
+      c.p = p; c.state = 'setup'; p.chair = c.i; p.setupStart = now; p.wq.chair = now - p.ready;
+      excl++; log(p, 'chair', 'setup');
+      H.push(now + p.d.setup, () => { integrate(now); excl--; infusing++; c.state = 'infusing'; p.drip = now; log(p, 'chair', 'infusing');
+        H.push(now + p.L, () => { integrate(now); infusing--; c.state = 'blocked'; p.infEnd = now; log(p, 'chair', 'blocked'); tdQ.push(p); dispatch(); });
+        dispatch(); });
+    }
+    function startTD(p) {
+      const c = chairs[p.chair]; c.state = 'takedown'; excl++; p.blocked = now - p.infEnd; log(p, 'chair', 'takedown');
+      H.push(now + p.d.takedown, () => { integrate(now); excl--; c.state = 'obs'; log(p, 'chair', 'obs');
+        H.push(now + p.d.obs, () => { integrate(now); c.p = null; c.state = 'idle'; leave(p, 'treated'); dispatch(); });
+        dispatch(); });
+    }
+    // sampler + hard close sweep
+    for (let t = P.open; t <= hardClose + 360; t += 5) H.push(t, () => {
+      integrate(now);
+      const s = { t: now, nurse: load(), excl, infusing, ready: readyQ.length, td: tdQ.length, busyChairs: P.chairs - freeChairs(), pipeline };
+      for (const k in stations) { s['q_' + k] = stations[k].q.length; s['b_' + k] = stations[k].busy; }
+      const waitArea = readyQ.length + Object.values(stations).reduce((a, st) => a + st.q.length, 0);
+      waitAreaPeak = Math.max(waitAreaPeak, waitArea); s.waitArea = waitArea;
+      series.push(s);
+    });
+    H.push(hardClose, () => { dispatch(); });
+    while (H.size) { const e = H.pop(); now = e.t; e.fn(); }
+    // patients stuck in pre-chair pipeline after hard close counted as deferred (rare)
+    for (const p of pts) if (!p.outcome) { p.outcome = 'deferred'; }
+
+    // ---- Scorecard ----
+    const treated = pts.filter(p => p.outcome === 'treated');
+    const waits = treated.map(p => p.drip - p.arrive).sort((a, b) => a - b);
+    const lastLeave = treated.reduce((m, p) => Math.max(m, p.leave), P.close);
+    const mean = a => a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0;
+    const p90 = a => a.length ? a[Math.min(a.length - 1, Math.floor(0.9 * a.length))] : 0;
+    const stageKeys = ['reg', 'blood', 'lab', 'doc', 'bill', 'pharm', 'chair'];
+    const decomp = {};
+    for (const k of stageKeys) {
+      const ps = treated.filter(p => p.wq[k] !== undefined);
+      decomp[k] = { q: mean(ps.map(p => p.wq[k] || 0)) * ps.length / Math.max(1, treated.length), s: k === 'chair' ? 0 : mean(ps.map(p => p.sv[k] || 0)) * ps.length / Math.max(1, treated.length) };
+    }
+    const setupMean = mean(treated.map(p => p.drip - p.setupStart));
+    const openMin = P.close - P.open;
+    const stUtil = {};
+    for (const k in stations) { const st = stations[k]; stUtil[k] = { util: st.cap === Infinity ? null : st.busyMin / (st.cap * Math.max(openMin, lastLeave - P.open)), maxQ: st.maxQ }; }
+    const byL = (lo, hi) => { const ps = treated.filter(p => p.L >= lo && p.L < hi); return ps.length ? mean(ps.map(p => p.drip - p.arrive)) : null; };
+    const clsWait = (c) => { const ps = treated.filter(p => p.cls === c); return ps.length ? mean(ps.map(p => p.drip - p.arrive)) : null; };
+    const K = {
+      n: pts.length, treated: treated.length, overflow: pts.filter(p => p.overflow).length, otPlan: pts.filter(p => p.otPlan).length,
+      unfit: pts.filter(p => p.outcome === 'unfit').length,
+      deferred: pts.filter(p => p.outcome === 'deferred').length,
+      noshow: pts.filter(p => p.outcome === 'noshow').length,
+      waitMean: mean(waits), waitP90: p90(waits),
+      chairWait: mean(treated.map(p => p.wq.chair || 0)),
+      tis: mean(treated.map(p => p.leave - p.arrive)),
+      idleChair: idleChairMin / 60, chairUtil: occChairMin / (P.chairs * openMin),
+      starve: starveMin / 60, nurseBound: nurseBoundMin / 60,
+      blocked: treated.reduce((a, p) => a + (p.blocked || 0), 0),
+      overtime: Math.max(0, lastLeave - P.close), lastLeave,
+      peakNurse, nurseSat: nurseSatMin / 60, nurseAvg: nurseLoadInt / Math.max(1, lastLeave - P.open), waitAreaPeak,
+      decomp, setupMean, stUtil,
+      waitPre: clsWait('pre'), waitSame: clsWait('same'),
+      equity: [byL(0, 60), byL(60, 120), byL(120, 240), byL(240, 999)],
+      readyPre: mean(treated.filter(p => p.cls === 'pre').map(p => p.ready - p.arrive)),
+      readySame: mean(treated.filter(p => p.cls === 'same').map(p => p.ready - p.arrive)),
+    };
+    K.notTreated = K.unfit + K.deferred + K.noshow;
+    K.cost = (P.wWait * (K.waitMean / 60)) + (P.wIdle * (K.idleChair / P.chairs)) + (P.wOT * (K.overtime / 60)) + P.wDef * K.deferred;
+    return { P, pts, K, series, DQ };
+  }
+
+  // Replications with CRN + 95% CI
+  const FIELDS = ['waitMean', 'waitP90', 'chairWait', 'idleChair', 'chairUtil', 'overtime', 'notTreated', 'deferred', 'unfit', 'noshow', 'peakNurse', 'starve', 'nurseBound', 'blocked', 'treated', 'tis', 'cost', 'waitAreaPeak', 'waitPre', 'waitSame', 'nurseSat', 'nurseAvg', 'n', 'overflow', 'otPlan'];
+  function summarise(ks, DQ) {
+    const S = {};
+    for (const f of FIELDS) {
+      const v = ks.map(k => k[f]).filter(x => x !== null && x !== undefined && !Number.isNaN(x));
+      const m = v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
+      const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, v.length - 1));
+      S[f] = { m, hw: v.length > 1 ? 1.96 * sd / Math.sqrt(v.length) : 0 };
+    }
+    S.otDays = ks.filter(k => k.overtime > 0).length / Math.max(1, ks.length);
+    S.days = ks.length;
+    if (DQ) { S.B = DQ.B; S.Bmean = DQ.mean; }
+    return S;
+  }
+  function replicate(P, days, seed0 = 1, DQin) {
+    const DQ = DQin || calibrate(P);
+    const ks = [];
+    for (let d = 0; d < days; d++) ks.push(simulate(P, seed0 + d, { DQ }).K);
+    return summarise(ks, DQ);
+  }
+  return { defaultParams, simulate, replicate, summarise, delayQuantiles, calibrate, genDay, RULES, STAGES, INFUSION_MIX, tri, triMean };
+})();
+</script><script>
+// ===================== UI =====================
+(() => {
+const E = Engine;
+const $ = (id) => document.getElementById(id);
+const fmtT = (m) => { m = Math.round(m); const h = Math.floor(m / 60), mm = ((m % 60) + 60) % 60; return String(h).padStart(2, '0') + ':' + String(mm).padStart(2, '0'); };
+const fmtH = (min) => (min / 60).toFixed(min >= 600 ? 1 : 2) + ' h';
+const fmtHM = (min) => { const s = Math.round(min); const h = Math.floor(s / 60), m = s % 60; return h ? `${h} h ${String(m).padStart(2, '0')}` : `${m} min`; };
+const tick = () => new Promise(r => setTimeout(r, 0));
+const css = {};
+function readCss() { const cs = getComputedStyle(document.documentElement); for (const k of ['bg', 'panel', 'panel-2', 'ink', 'ink-2', 'muted', 'line', 'line-2', 'accent', 'accent-soft', 'pre', 'same', 'st-setup', 'st-inf', 'st-block', 'st-td', 'st-obs', 'warn', 'crit', 'good', 'heat-0', 'heat-1']) css[k] = cs.getPropertyValue('--' + k).trim(); }
+readCss();
+
+// ---------------- Parameters & controls ----------------
+let P = E.defaultParams();
+let seed = 7;
+const PRESETS = {
+  base: {},
+  feasible: { fill: 0.6 },
+  sanity: { rule: 'at8_fcfs', preCleared: 0 },
+  kochi3: { preCleared: 0.6, precompound: true, templateOrder: 'lpt', rule: 'buffer' },
+  tmh: { chairs: 75, nurses: 18, close: 1200, stageCaps: { reg: 8, blood: 10, doc: 12, pharm: 10 } },
+};
+function applyPreset(name) {
+  const d = E.defaultParams(); const pr = PRESETS[name] || {};
+  P = Object.assign(d, pr);
+  if (pr.stageCaps) for (const k in pr.stageCaps) P.stages.find(s => s.key === k).cap = pr.stageCaps[k];
+  delete P.stageCaps;
+  writeControls();
+}
+const ruleSel = $('rule');
+for (const k in E.RULES) { const o = document.createElement('option'); o.value = k; o.textContent = E.RULES[k].name; ruleSel.appendChild(o); }
+for (const id of ['open', 'close']) { const sel = $(id); for (let h = 5; h <= 23; h++) { const o = document.createElement('option'); o.value = h * 60; o.textContent = String(h).padStart(2, '0') + ':00'; sel.appendChild(o); } }
+const NUM = ['chairs', 'nurses', 'monitor', 'maxOT', 'devEarly', 'devLate', 'wWait', 'wIdle', 'wOT', 'wDef'];
+const RANGE = ['q', 'preCleared', 'fill', 'spread', 'devMult'];
+const CHK = ['allowEarly', 'precompound', 'takedownFirst'];
+function writeControls() {
+  ruleSel.value = P.rule; $('templateOrder').value = P.templateOrder;
+  $('open').value = P.open; $('close').value = P.close;
+  for (const k of NUM) $(k).value = P[k];
+  for (const k of RANGE) $(k).value = P[k];
+  for (const k of CHK) $(k).checked = !!P[k];
+  $('unfit').value = Math.round(P.unfit * 100); $('noShow').value = Math.round(P.noShow * 100);
+  $('seed').value = seed;
+  buildStageTable(); buildMixTable(); outputs();
+}
+function outputs() {
+  $('q-out').textContent = Math.round(P.q * 100) + '%';
+  $('preCleared-out').textContent = Math.round(P.preCleared * 100) + '%';
+  $('fill-out').textContent = Math.round(P.fill * 100) + '%';
+  $('spread-out').textContent = P.spread.toFixed(2);
+  $('devMult-out').textContent = P.devMult.toFixed(2);
+  $('rule-desc').textContent = E.RULES[P.rule].desc;
+  $('q-field').hidden = P.rule !== 'buffer';
+}
+function buildStageTable() {
+  const t = $('stage-tbl');
+  t.innerHTML = '<tr><th>Step</th><th>Low</th><th>Mode</th><th>High</th><th title="Servers; 0 = no queue">Cap</th></tr>' + P.stages.map((s, i) =>
+    `<tr><td title="${s.src}">${s.step}. ${s.name}</td>` + ['lo', 'mode', 'hi'].map(f => `<td><input type="number" id="st-${s.key}-${f}" data-i="${i}" data-f="${f}" value="${s[f]}" min="0" step="1" aria-label="${s.name} ${f}"></td>`).join('') +
+    `<td>${s.cap === null ? '<span class="hint" title="Uses a nurse">RN</span>' : `<input type="number" id="st-${s.key}-cap" data-i="${i}" data-f="cap" value="${s.cap === Infinity ? 0 : s.cap}" min="0" step="1" aria-label="${s.name} capacity">`}</td></tr>`).join('');
+}
+function buildMixTable() {
+  const t = $('mix-tbl');
+  t.innerHTML = '<tr><th>Length</th><th>Share %</th></tr>' + P.mix.map((m, i) => `<tr><td>${m.label}</td><td><input type="number" id="mix-${i}" data-m="${i}" value="${Math.round(m.w * 100)}" min="0" max="100" step="1" aria-label="${m.label} share"></td></tr>`).join('');
+}
+function readControls() {
+  P.rule = ruleSel.value; P.templateOrder = $('templateOrder').value;
+  P.open = +$('open').value; P.close = Math.max(P.open + 120, +$('close').value);
+  for (const k of NUM) { const v = parseFloat($(k).value); if (!Number.isNaN(v)) P[k] = v; }
+  P.chairs = Math.max(1, Math.round(P.chairs)); P.nurses = Math.max(1, Math.round(P.nurses)); P.monitor = Math.max(1, Math.round(P.monitor));
+  for (const k of RANGE) P[k] = parseFloat($(k).value);
+  for (const k of CHK) P[k] = $(k).checked;
+  P.unfit = (+$('unfit').value || 0) / 100; P.noShow = (+$('noShow').value || 0) / 100;
+  document.querySelectorAll('#stage-tbl input').forEach(inp => {
+    const s = P.stages[+inp.dataset.i], f = inp.dataset.f; let v = Math.max(0, parseFloat(inp.value) || 0);
+    if (f === 'cap') s.cap = v === 0 ? Infinity : Math.round(v); else s[f] = v;
+  });
+  for (const s of P.stages) { if (s.mode < s.lo) s.mode = s.lo; if (s.hi < s.mode) s.hi = s.mode; }
+  document.querySelectorAll('#mix-tbl input').forEach(inp => { P.mix[+inp.dataset.m].w = Math.max(0, parseFloat(inp.value) || 0) / 100; });
+  if (P.mix.every(m => m.w === 0)) P.mix[1].w = 1;
+  seed = Math.max(1, Math.round(+$('seed').value || 1));
+  outputs();
+}
+let deb;
+document.querySelector('.rail').addEventListener('input', (e) => {
+  if (e.target.id === 'preset') return;
+  readControls(); $('preset').value = 'custom';
+  clearTimeout(deb); deb = setTimeout(runDay, 160);
+});
+$('preset').addEventListener('change', () => { applyPreset($('preset').value); runDay(); });
+$('newday').addEventListener('click', () => { seed = 1 + Math.floor(Math.random() * 99998); $('seed').value = seed; runDay(); });
+
+// ---------------- Tabs ----------------
+document.querySelectorAll('.tabs button').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.tabs button').forEach(x => x.setAttribute('aria-selected', x === b ? 'true' : 'false'));
+  for (const v of ['live', 'exp', 'model']) $('view-' + v).hidden = v !== b.dataset.view;
+  if (b.dataset.view === 'live') { resizeFloor(); renderCharts(); }
+  if (b.dataset.view === 'exp') rerenderExp();
+}));
+
+// ---------------- Tooltip ----------------
+const tip = $('tip');
+function showTip(e, html) { tip.innerHTML = html; tip.hidden = false; const pad = 14; let x = e.clientX + pad, y = e.clientY + pad; const r = tip.getBoundingClientRect(); if (x + r.width > innerWidth - 8) x = e.clientX - r.width - pad; if (y + r.height > innerHeight - 8) y = e.clientY - r.height - pad; tip.style.left = x + 'px'; tip.style.top = y + 'px'; }
+function hideTip() { tip.hidden = true; }
+
+// ---------------- Run one day ----------------
+let R = null, T = 480, tEnd = 1200, playing = false, speed = 15;
+const ZONES = [
+  { key: 'reg', name: 'Registration', step: '1' }, { key: 'blood', name: 'Blood draw', step: '2' }, { key: 'lab', name: 'Lab result', step: '3' },
+  { key: 'doc', name: 'Doctor review', step: '4' }, { key: 'bill', name: 'Billing, insurance', step: '5' }, { key: 'pharm', name: 'Drug prepared', step: '6' },
+  { key: 'chairq', name: 'Wait for chair', step: '7' },
+];
+function runDay() {
+  readCss();
+  R = E.simulate(P, seed, { trace: true });
+  const lastLeave = R.pts.reduce((m, p) => Math.max(m, p.leave || 0), P.close);
+  tEnd = Math.max(P.close + 30, lastLeave + 15);
+  if (T < P.open - 15 || T > tEnd) T = P.open - 10;
+  $('scrub').min = P.open - 15; $('scrub').max = tEnd; $('scrub').value = T;
+  $('floor-eyebrow').textContent = `Day #${seed} · ${R.K.n} booked · ${E.RULES[P.rule].short} · ${Math.round(P.preCleared * 100)}% pre-cleared`;
+  renderKpis(); renderBottleneck(); resizeFloor(); renderCharts();
+  repResult = null; renderKpiCI();
+}
+
+// ---------------- KPIs ----------------
+let repResult = null;
+const KPI_DEF = [
+  { k: 'waitMean', label: 'Mean wait to drip', f: v => fmtHM(v), st: v => v <= 120 ? 'good' : v <= 210 ? 'warn' : 'crit', d: K => `P90 ${fmtHM(K.waitP90)} · Kochi baseline 3 h 30` },
+  { k: 'waitGap', label: 'Same-day vs pre-cleared', f: v => v === null ? '—' : fmtHM(v), d: K => `${K.waitSame !== null ? fmtHM(K.waitSame) : '—'} vs ${K.waitPre !== null ? fmtHM(K.waitPre) : '—'}`, ciKey: null },
+  { k: 'chairUtil', label: 'Chair utilisation', f: v => Math.round(v * 100) + '%', st: v => v >= 0.75 ? 'good' : v >= 0.6 ? 'warn' : 'crit', d: K => `${K.idleChair.toFixed(0)} idle chair-h in opening hours` },
+  { k: 'starve', label: 'Chairs starved', f: v => v.toFixed(0) + ' <small>chair-h</small>', st: (v, K) => v / (P.chairs * (P.close - P.open) / 60) <= 0.15 ? 'good' : v / (P.chairs * (P.close - P.open) / 60) <= 0.3 ? 'warn' : 'crit', d: K => `Idle while patients were not yet ready` },
+  { k: 'overtime', label: 'Overtime past closing', f: v => fmtHM(v), st: v => v <= 15 ? 'good' : v <= 60 ? 'warn' : 'crit', d: K => `Last patient out ${fmtT(K.lastLeave)}` },
+  { k: 'notTreated', label: 'Not treated on booked day', f: v => v.toFixed(v % 1 ? 1 : 0) + ' <small>pts</small>', st: (v, K) => (K.deferred) === 0 ? 'good' : K.deferred <= 2 ? 'warn' : 'crit', d: K => `${K.unfit} unfit · ${K.deferred} sent home for capacity · ${K.noshow} no-show` },
+  { k: 'treated', label: 'Treated', f: v => v.toFixed(v % 1 ? 1 : 0) + ` <small>of ${R.K.n}</small>`, d: K => `${K.overflow} did not fit the template, came as standby` },
+  { k: 'nurseSat', label: 'Nurses saturated', f: v => v.toFixed(1) + ' <small>h</small>', st: v => v <= 1 ? 'good' : v <= 3 ? 'warn' : 'crit', d: K => `No nurse free for a new setup · avg load ${Math.round(K.nurseAvg * 100)}%` },
+  { k: 'blocked', label: 'Chair blocking', f: v => Math.round(v) + ' <small>min</small>', st: (v, K) => v / Math.max(1, K.treated) <= 5 ? 'good' : v / Math.max(1, K.treated) <= 15 ? 'warn' : 'crit', d: K => `Drip done, waiting for a nurse to take down` },
+  { k: 'waitAreaPeak', label: 'Peak waiting area', f: v => Math.round(v) + ' <small>pts</small>', d: K => `Patients queuing at once (attendants not counted)` },
+  { k: 'cost', label: 'Weighted cost', f: v => v.toFixed(2), d: K => `The score the buffer tuner minimises` },
+];
+const ST_LBL = { good: 'OK', warn: 'Watch', crit: 'Problem' };
+function renderKpis() {
+  const K = R.K; K.waitGap = (K.waitSame !== null && K.waitPre !== null) ? K.waitSame - K.waitPre : null;
+  $('kpis').innerHTML = KPI_DEF.map(d => {
+    const v = K[d.k]; const st = d.st && v !== null ? d.st(v, K) : null;
+    return `<div class="kpi" title="${d.label}"><div class="k"><span>${d.label}</span>${st ? `<span class="pill ${st}">${ST_LBL[st]}</span>` : ''}</div>
+      <div class="v">${v === null || v === undefined ? '—' : d.f(v)}</div><div class="d">${d.d(K)}</div><div class="ci" id="ci-${d.k}"></div></div>`;
+  }).join('');
+}
+function renderKpiCI() {
+  for (const d of KPI_DEF) {
+    const el = $('ci-' + d.k); if (!el) continue;
+    if (!repResult) { el.textContent = '100-day estimate not run'; el.style.opacity = .6; continue; }
+    el.style.opacity = 1;
+    let key = d.k;
+    if (key === 'waitGap') { const a = repResult.waitSame, b = repResult.waitPre; el.textContent = `100 days: ${fmtHM(a.m - b.m)}`; continue; }
+    const s = repResult[key]; if (!s) { el.textContent = ''; continue; }
+    const conv = { waitMean: v => (v / 60).toFixed(2) + ' h', chairUtil: v => (v * 100).toFixed(1) + '%', overtime: v => v.toFixed(0) + ' min', blocked: v => v.toFixed(0) + ' min' };
+    const f = conv[key] || (v => v.toFixed(key === 'cost' || key === 'nurseSat' ? 2 : 1));
+    const hw = key === 'waitMean' ? (s.hw / 60).toFixed(2) + ' h' : key === 'chairUtil' ? (s.hw * 100).toFixed(1) + '%' : s.hw.toFixed(key === 'cost' || key === 'nurseSat' ? 2 : 1);
+    el.textContent = `100 days: ${f(s.m)} ± ${hw}`;
+  }
+}
+async function replicateAsync(Pp, days, onProg, seed0 = 1) {
+  const DQ = E.calibrate(Pp); const ks = [];
+  for (let d = 0; d < days; d++) { ks.push(E.simulate(Pp, seed0 + d, { DQ }).K); if (d % 10 === 9) { onProg && onProg((d + 1) / days); await tick(); } }
+  return E.summarise(ks, DQ);
+}
+$('rep').addEventListener('click', async () => {
+  const b = $('rep'); b.disabled = true; const prog = $('rep-prog');
+  const snap = JSON.parse(JSON.stringify(P, (k, v) => v === Infinity ? 'Inf' : v), (k, v) => v === 'Inf' ? Infinity : v);
+  repResult = await replicateAsync(snap, 100, f => prog.style.width = (f * 100) + '%');
+  prog.style.width = '100%'; b.disabled = false; renderKpiCI();
+  setTimeout(() => prog.style.width = '0', 800);
+});
+
+// ---------------- Bottleneck panel ----------------
+function renderBottleneck() {
+  const K = R.K, D = K.decomp;
+  const rows = [
+    ['reg', '1. Registration'], ['blood', '2. Blood draw'], ['lab', '3. Lab result'], ['doc', '4. Doctor review'], ['bill', '5. Billing'], ['pharm', '6. Drug prepared'], ['chair', '7. Wait for chair'], ['setup', '8. Line, pre-meds'],
+  ].map(([k, n]) => ({ k, n, s: k === 'setup' ? K.setupMean : (D[k] ? D[k].s : 0), q: k === 'setup' ? 0 : (D[k] ? D[k].q : 0) }));
+  const max = Math.max(...rows.map(r => r.s + r.q), 1);
+  $('rank').innerHTML = rows.map(r => `<li><span>${r.n}</span><span class="bar" title="${r.n}: ${r.s.toFixed(0)} min work, ${r.q.toFixed(0)} min queueing">
+    ${r.s > 0.2 ? `<i style="width:${r.s / max * 100}%;background:var(--st-obs)"></i>` : ''}${r.q > 0.2 ? `<i style="width:${r.q / max * 100}%;background:var(--accent)"></i>` : ''}</span>
+    <span class="val">${r.s.toFixed(0)}${r.q >= 0.5 ? `<span style="color:var(--accent)"> +${r.q.toFixed(0)}</span>` : ''}</span></li>`).join('');
+  // verdict
+  const capH = P.chairs * (P.close - P.open) / 60;
+  const queues = rows.filter(r => r.k !== 'setup' && r.k !== 'lab' && r.k !== 'bill').sort((a, b) => b.q - a.q);
+  const top = queues[0];
+  const util = (k) => K.stUtil[k] && K.stUtil[k].util !== null ? Math.round(K.stUtil[k].util * 100) + '%' : '';
+  let head, body;
+  const starveShare = K.starve / capH;
+  if (starveShare >= 0.2 && (top.q < 25 || starveShare > 0.3)) {
+    head = 'Ready time is the binding constraint';
+    body = `Chairs sat idle for ${K.starve.toFixed(0)} chair-hours (${Math.round(starveShare * 100)}% of capacity) while patients were still in steps 1–6. Same-day patients reach a chair ${fmtHM(K.readySame || 0)} after arriving; pre-cleared patients ${fmtHM(K.readyPre || 0)}.`;
+  } else if (top.k === 'chair') {
+    const nurseCause = K.nurseBound > 0.25 * K.idleChair || K.nurseSat > 2;
+    head = nurseCause ? 'Nurses are the binding constraint' : 'Chairs are the binding constraint';
+    body = `Ready patients waited ${fmtHM(top.q)} on average for a chair. ` + (nurseCause ? `Nurses were saturated for ${K.nurseSat.toFixed(1)} h; ${K.nurseBound.toFixed(0)} chair-hours stood free with a ready patient but no nurse.` : `Chairs were ${Math.round(K.chairUtil * 100)}% used in opening hours.`);
+  } else if (top.q >= 5) {
+    head = `${top.n.replace(/^\d\. /, '')} is the worst queue`;
+    body = `Patients queue ${fmtHM(top.q)} on average there${util(top.k) ? ` (servers ${util(top.k)} busy over the day)` : ''}. Add a server or stagger arrivals.`;
+  } else { head = 'No single queue dominates'; body = 'Waiting is mostly the work itself: lab turnaround and billing approval.'; }
+  const extra = [];
+  if (K.deferred) extra.push(`${K.deferred} sent home for capacity`);
+  if (K.overtime > 15) extra.push(`${fmtHM(K.overtime)} overtime`);
+  if (K.overflow) extra.push(`${K.overflow} did not fit the template`);
+  $('verdict').innerHTML = `<b>${head}</b>${body}${extra.length ? ' Also: ' + extra.join(' · ') + '.' : ''}`;
+}
+
+// ---------------- SVG helpers ----------------
+const NS = 'http://www.w3.org/2000/svg';
+function S(tag, attrs = {}, parent) { const e = document.createElementNS(NS, tag); for (const k in attrs) e.setAttribute(k, attrs[k]); if (parent) parent.appendChild(e); return e; }
+function svgBox(el, W, H) { el.innerHTML = ''; const svg = S('svg', { viewBox: `0 0 ${W} ${H}`, width: W, height: H, role: 'img' }); el.appendChild(svg); return svg; }
+function niceMax(v) { if (v <= 0) return 1; const p = Math.pow(10, Math.floor(Math.log10(v))); for (const m of [1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]) if (m * p >= v) return m * p; return 10 * p; }
+function yAxis(svg, x0, x1, y, yMax, ticks, fmt) {
+  const g = S('g', { class: 'grid' }, svg);
+  for (let i = 0; i <= ticks; i++) { const v = yMax * i / ticks, yy = y(v); S('line', { x1: x0, x2: x1, y1: yy, y2: yy, 'stroke-width': 1 }, g); const t = S('text', { x: x0 - 6, y: yy + 3.5, 'text-anchor': 'end' }, g); t.textContent = fmt(v); }
+}
+function xTimeAxis(svg, x, y0, t0, t1) {
+  const g = S('g', { class: 'ax' }, svg);
+  const step = (t1 - t0) > 900 ? 180 : (t1 - t0) > 480 ? 120 : 60;
+  for (let t = Math.ceil(t0 / step) * step; t <= t1; t += step) { const t2 = S('text', { x: x(t), y: y0 + 14, 'text-anchor': 'middle' }, g); t2.textContent = fmtT(t); S('line', { x1: x(t), x2: x(t), y1: y0, y2: y0 + 4 }, g); }
+}
+const nowLines = [];
+function addNowLine(svg, x, y0, y1) { const l = S('line', { class: 'nowline', x1: x(T), x2: x(T), y1: y0, y2: y1 }, svg); nowLines.push({ l, x }); }
+function updateNowLines() { for (const n of nowLines) { const xx = n.x(T); n.l.setAttribute('x1', xx); n.l.setAttribute('x2', xx); } }
+
+function lineChart(el, { t0, t1, xs, series, yMax, yFmt, cap, capLabel, H = 230, area }) {
+  const W = Math.max(320, el.clientWidth || 600); const m = { l: 40, r: 14, t: 34, b: 24 };
+  const svg = svgBox(el, W, H);
+  const x = (t) => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r), y = (v) => H - m.b - v / yMax * (H - m.t - m.b);
+  yAxis(svg, m.l, W - m.r, y, yMax, 4, yFmt); xTimeAxis(svg, x, H - m.b, t0, t1);
+  if (cap !== undefined) { S('line', { x1: m.l, x2: W - m.r, y1: y(cap), y2: y(cap), stroke: css.crit, 'stroke-width': 1.5, 'stroke-dasharray': '5 4' }, svg); const t = S('text', { x: W - m.r, y: y(cap) - 5, 'text-anchor': 'end' }, svg); t.textContent = capLabel; t.style.fill = css.crit; }
+  const labels = [];
+  series.forEach(s => {
+    const pts = xs.map((t, i) => `${x(t).toFixed(1)},${y(Math.min(yMax, s.ys[i])).toFixed(1)}`);
+    if (area) S('path', { d: `M${x(xs[0])},${y(0)}L${pts.join('L')}L${x(xs[xs.length - 1])},${y(0)}Z`, fill: s.color, 'fill-opacity': 0.14 }, svg);
+    S('path', { d: 'M' + pts.join('L'), fill: 'none', stroke: s.color, 'stroke-width': 2, 'stroke-linejoin': 'round' }, svg);
+    let im = 0; s.ys.forEach((v, i) => { if (v > s.ys[im]) im = i; });
+    labels.push({ s, y: y(Math.min(yMax, s.ys[s.ys.length - 1])), peak: s.ys[im] });
+  });
+  // direct labels at right edge, de-collided
+  let lx = m.l, ly = 10;
+  series.forEach(s => { const t = S('text', { x: lx + 14, y: ly + 4 }, svg); t.textContent = s.name; const w = s.name.length * 6.2 + 30; S('rect', { x: lx, y: ly - 4, width: 10, height: 10, rx: 2, fill: s.color }, svg); lx += w; if (lx > W - 120) { lx = m.l; ly += 15; } });
+  addNowLine(svg, x, m.t, H - m.b);
+  const cross = S('line', { y1: m.t, y2: H - m.b, stroke: css['ink-2'], 'stroke-width': 1, opacity: 0 }, svg);
+  const hit = S('rect', { x: m.l, y: m.t, width: W - m.l - m.r, height: H - m.t - m.b, fill: 'transparent' }, svg);
+  hit.addEventListener('mousemove', (e) => {
+    const r = svg.getBoundingClientRect(); const px = (e.clientX - r.left) * W / r.width; const t = t0 + (px - m.l) / (W - m.l - m.r) * (t1 - t0);
+    let i = 0, bd = 1e9; xs.forEach((tt, j) => { const d = Math.abs(tt - t); if (d < bd) { bd = d; i = j; } });
+    cross.setAttribute('x1', x(xs[i])); cross.setAttribute('x2', x(xs[i])); cross.setAttribute('opacity', 0.6);
+    showTip(e, `<b>${fmtT(xs[i])}</b><br>` + series.map(s => `<span style="color:${s.color}">●</span> ${s.name}: <b>${yFmt(s.ys[i], true)}</b>`).join('<br>'));
+  });
+  hit.addEventListener('mouseleave', () => { cross.setAttribute('opacity', 0); hideTip(); });
+  return svg;
+}
+
+// ---------------- Live charts ----------------
+function renderCharts() {
+  if (!R || $('view-live').hidden) return;
+  nowLines.length = 0;
+  const ser = R.series.filter(s => s.t <= tEnd);
+  const xs = ser.map(s => s.t);
+  const t0 = P.open, t1 = tEnd;
+  // queues
+  const qs = [
+    { name: 'Registration', key: 'q_reg', color: getVar('--q-reg') }, { name: 'Blood draw', key: 'q_blood', color: getVar('--q-blood') },
+    { name: 'Doctor', key: 'q_doc', color: getVar('--q-doc') }, { name: 'Pharmacy', key: 'q_pharm', color: getVar('--q-pharm') },
+    { name: 'Chair queue', key: 'ready', color: getVar('--q-chair') },
+  ].map(q => ({ ...q, ys: ser.map(s => s[q.key] || 0) }));
+  const qMax = niceMax(Math.max(4, ...qs.flatMap(q => q.ys)));
+  lineChart($('ch-queue'), { t0, t1, xs, series: qs, yMax: qMax, yFmt: (v) => Math.round(v) + '' });
+  // nurse load
+  const nl = [{ name: 'Nurse load', color: css.accent, ys: ser.map(s => s.nurse * 100) }, { name: 'Chairs busy', color: css['st-inf'], ys: ser.map(s => s.busyChairs / P.chairs * 100) }];
+  lineChart($('ch-nurse'), { t0, t1, xs, series: nl, yMax: Math.max(100, niceMax(Math.max(...nl[0].ys))), yFmt: (v) => Math.round(v) + '%', cap: 100, capLabel: 'Capacity', area: true });
+  renderIdle(); renderHeat(ser); renderDelay(); renderGantt();
+  updateNowLines();
+}
+function getVar(v) { return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function renderIdle() {
+  const el = $('ch-idle'); const K = R.K; const capH = P.chairs * (P.close - P.open) / 60;
+  const occ = K.chairUtil * capH, st = K.starve, nb = K.nurseBound, nd = Math.max(0, capH - occ - st - nb);
+  const segs = [
+    { n: 'In use', v: occ, c: css['st-inf'], long: 'Chair occupied' }, { n: 'Starved', v: st, c: css.accent, long: 'Free chair, patients still in steps 1–6' },
+    { n: 'Nurse-bound', v: nb, c: css['st-setup'], long: 'Free chair and a ready patient, but no nurse' }, { n: 'No demand', v: nd, c: css['line-2'], long: 'Free chair, nobody left to treat' },
+  ];
+  const W = Math.max(320, el.clientWidth || 600), H = 92; const svg = svgBox(el, W, H);
+  let x = 0; const bw = W, gap = 2;
+  segs.forEach((s, i) => {
+    const w = Math.max(0, s.v / capH * bw - (i < segs.length - 1 ? gap : 0));
+    const r = S('rect', { x, y: 6, width: Math.max(0, w), height: 26, rx: 4, fill: s.c }, svg);
+    r.addEventListener('mousemove', e => showTip(e, `${s.n}: ${s.long}<br><b>${s.v.toFixed(1)} chair-h</b> · ${(s.v / capH * 100).toFixed(0)}%`)); r.addEventListener('mouseleave', hideTip);
+    x += w + gap;
+  });
+  // legend rows
+  segs.forEach((s, i) => {
+    const col = i % 2, row = Math.floor(i / 2); const lx = col * (W / 2), ly = 52 + row * 18;
+    S('rect', { x: lx, y: ly - 9, width: 10, height: 10, rx: 2, fill: s.c }, svg);
+    const t = S('text', { x: lx + 15, y: ly }, svg); t.textContent = `${s.n} · ${s.v.toFixed(0)} h (${(s.v / capH * 100).toFixed(0)}%)`;
+  });
+}
+function mixColor(a, b, f) { const pa = hex(a), pb = hex(b); return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * f)).join(',')})`; }
+function hex(h) { h = h.replace('#', ''); if (h.length === 3) h = h.split('').map(c => c + c).join(''); return [0, 2, 4].map(i => parseInt(h.substr(i, 2), 16)); }
+function renderHeat(ser) {
+  const el = $('ch-heat');
+  const res = [
+    { n: 'Registration', f: s => s.b_reg / cap('reg') }, { n: 'Blood draw', f: s => s.b_blood / cap('blood') }, { n: 'Doctors', f: s => s.b_doc / cap('doc') },
+    { n: 'Pharmacy', f: s => s.b_pharm / cap('pharm') }, { n: 'Chairs', f: s => s.busyChairs / P.chairs }, { n: 'Nurses', f: s => s.nurse },
+  ].filter(r => !Number.isNaN(r.f(ser[0] || {})));
+  function cap(k) { const c = P.stages.find(s => s.key === k).cap; return c === Infinity ? NaN : c; }
+  const h0 = Math.floor(P.open / 60), h1 = Math.ceil(tEnd / 60);
+  const hours = []; for (let h = h0; h < h1; h++) hours.push(h);
+  const W = Math.max(320, el.clientWidth || 600), lw = 86, rh = 20, H = 42 + res.length * rh + 4; const svg = svgBox(el, W, H);
+  const cw = (W - lw) / hours.length;
+  const title = S('text', { x: 0, y: 11 }, svg); title.textContent = 'Utilisation by hour'; title.style.fontWeight = 700;
+  hours.forEach((h, j) => { if (hours.length > 14 && j % 2) return; const t = S('text', { x: lw + j * cw + cw / 2, y: 30, 'text-anchor': 'middle' }, svg); t.textContent = String(h).padStart(2, '0'); });
+  res.forEach((r, i) => {
+    const t = S('text', { x: 0, y: 36 + i * rh + 14 }, svg); t.textContent = r.n;
+    hours.forEach((h, j) => {
+      const ss = ser.filter(s => s.t >= h * 60 && s.t < h * 60 + 60); const v = ss.length ? ss.reduce((a, s) => a + r.f(s), 0) / ss.length : 0;
+      const rect = S('rect', { x: lw + j * cw + 1, y: 36 + i * rh + 1, width: Math.max(1, cw - 2), height: rh - 2, rx: 3, fill: mixColor(css['heat-0'], css['heat-1'], Math.min(1, v)) }, svg);
+      rect.addEventListener('mousemove', e => showTip(e, `${r.n}, ${String(h).padStart(2, '0')}:00–${String(h + 1).padStart(2, '0')}:00<br><b>${Math.round(v * 100)}%</b> busy`)); rect.addEventListener('mouseleave', hideTip);
+    });
+  });
+}
+function renderDelay() {
+  const el = $('ch-delay'); const DQ = R.DQ;
+  const real = { pre: [], same: [] }; R.pts.forEach(p => { if (p.ready !== undefined) real[p.cls].push(p.ready - p.told); });
+  const W = Math.max(320, el.clientWidth || 600), rowH = 92, H = rowH * 2 + 34; const svg = svgBox(el, W, H);
+  const all = DQ.pre.concat(DQ.same); const xMax = niceMax(Math.max(240, all[Math.floor(all.length * 0.995)] || 300, ...real.pre, ...real.same));
+  const m = { l: 110, r: 16 }; const x = v => m.l + v / xMax * (W - m.l - m.r);
+  const bin = xMax > 400 ? 15 : 10;
+  [['pre', 'Pre-cleared', css.pre], ['same', 'Same-day test', css.same]].forEach(([c, name, col], r) => {
+    const arr = DQ[c]; const y0 = 8 + r * rowH, h = rowH - 26;
+    const nb = Math.ceil(xMax / bin); const cnt = new Array(nb).fill(0); arr.forEach(v => { const b = Math.min(nb - 1, Math.max(0, Math.floor(v / bin))); cnt[b]++; });
+    const cm = Math.max(...cnt, 1);
+    const lab = S('text', { x: 0, y: y0 + 14 }, svg); lab.textContent = name; lab.style.fontWeight = 700;
+    const l2 = S('text', { x: 0, y: y0 + 30 }, svg); l2.textContent = arr.length ? `B = ${fmtHM(DQ.B[c])}` : 'no patients';
+    const l3 = S('text', { x: 0, y: y0 + 44 }, svg); l3.textContent = arr.length ? `mean ${fmtHM(DQ.mean[c])}` : '';
+    cnt.forEach((v, i) => { if (!v) return; const bh = v / cm * h; const rect = S('rect', { x: x(i * bin) + 1, y: y0 + h - bh, width: Math.max(1, x(bin) - x(0) - 2), height: bh, rx: 2, fill: col, 'fill-opacity': 0.85 }, svg);
+      rect.addEventListener('mousemove', e => showTip(e, `${name}: D ${i * bin}–${(i + 1) * bin} min<br><b>${(v / arr.length * 100).toFixed(1)}%</b> of pilot patients`)); rect.addEventListener('mouseleave', hideTip); });
+    // realised this day as ticks
+    real[c].forEach(v => S('line', { x1: x(v), x2: x(v), y1: y0 + h + 3, y2: y0 + h + 9, stroke: col, 'stroke-width': 1.5 }, svg));
+    S('line', { x1: m.l, x2: W - m.r, y1: y0 + h, y2: y0 + h, stroke: css['line-2'] }, svg);
+    if (arr.length) { const bx = x(DQ.B[c]); S('line', { x1: bx, x2: bx, y1: y0 - 2, y2: y0 + h + 10, stroke: css.ink, 'stroke-width': 1.5, 'stroke-dasharray': '4 3' }, svg);
+      const t = S('text', { x: bx + 4, y: y0 + 8 }, svg); t.textContent = `q${Math.round(P.q * 100)}`; t.style.fill = css.ink; }
+  });
+  const gx = S('g', { class: 'ax' }, svg);
+  for (let v = 0; v <= xMax; v += xMax > 400 ? 120 : 60) { const t = S('text', { x: x(v), y: H - 6, 'text-anchor': 'middle' }, gx); t.textContent = fmtHM(v).replace(' 00', ''); }
+}
+function renderGantt() {
+  const el = $('ch-gantt');
+  const W = Math.max(520, el.clientWidth || 700); const rh = P.chairs > 40 ? 9 : P.chairs > 24 ? 12 : 16; const m = { l: 34, r: 12, t: 6, b: 24 };
+  const H = m.t + P.chairs * rh + m.b; const svg = svgBox(el, W, H);
+  const t0 = P.open, t1 = tEnd; const x = t => m.l + (t - t0) / (t1 - t0) * (W - m.l - m.r);
+  // opening hours band
+  S('rect', { x: x(P.close), y: m.t, width: Math.max(0, x(t1) - x(P.close)), height: P.chairs * rh, fill: css.crit, 'fill-opacity': 0.06 }, svg);
+  const tc = S('text', { x: x(P.close) + 4, y: H - m.b - 4 }, svg); tc.textContent = 'after closing'; tc.style.fill = css.crit;
+  for (let c = 0; c < P.chairs; c++) { if (P.chairs <= 24 || c % 5 === 0) { const t = S('text', { x: m.l - 6, y: m.t + c * rh + rh / 2 + 3.5, 'text-anchor': 'end' }, svg); t.textContent = c + 1; } }
+  xTimeAxis(svg, x, H - m.b, t0, t1);
+  R.pts.forEach(p => {
+    if (p.setupStart === undefined) return;
+    const y = m.t + p.chair * rh + 1, h = rh - 2; const col = p.cls === 'pre' ? css.pre : css.same;
+    const end = p.leave ?? tEnd;
+    const g = S('g', {}, svg);
+    S('rect', { x: x(p.setupStart), y, width: Math.max(1, x(end) - x(p.setupStart) - 1), height: h, rx: 3, fill: col, 'fill-opacity': 0.35 }, g);
+    if (p.drip !== undefined) S('rect', { x: x(p.drip), y, width: Math.max(1, x(p.infEnd ?? end) - x(p.drip)), height: h, fill: col }, g);
+    if (p.blocked > 0.5) S('rect', { x: x(p.infEnd), y, width: Math.max(1, x(p.infEnd + p.blocked) - x(p.infEnd)), height: h, fill: css['st-block'] }, g);
+    g.addEventListener('mousemove', e => showTip(e, `Patient ${p.id + 1} · ${p.cls === 'pre' ? 'pre-cleared' : 'same-day test'}<br>Told ${fmtT(p.told)} · arrived ${fmtT(p.arrive)} · ready ${fmtT(p.ready)}<br>${p.slot !== null && p.slot !== undefined ? `Planned slot ${fmtT(p.slot)} · ` : ''}chair ${fmtT(p.setupStart)} · drip ${p.drip !== undefined ? fmtT(p.drip) : '—'}<br>Infusion ${fmtHM(p.L)} · left ${p.leave ? fmtT(p.leave) : '—'}<br>Wait to drip <b>${p.drip !== undefined ? fmtHM(p.drip - p.arrive) : '—'}</b>`));
+    g.addEventListener('mouseleave', hideTip);
+  });
+  R.pts.forEach(p => { if (p.slot === null || p.slot === undefined || p.chairPlan === null || p.chairPlan === undefined) return; const xx = x(p.slot), y = m.t + p.chairPlan * rh; S('path', { d: `M${xx - 3},${y}L${xx + 3},${y}L${xx},${y + 4}Z`, fill: css.ink, opacity: 0.7 }, svg); });
+  addNowLine(svg, x, m.t, H - m.b);
+}
+
+// ---------------- Floor animation ----------------
+const cv = $('floor'), ctx = cv.getContext('2d');
+let L = null; const disp = new Map(); let snap = true;
+function resizeFloor() {
+  if ($('view-live').hidden) return;
+  const W = cv.parentElement.clientWidth; const dpr = window.devicePixelRatio || 1;
+  L = layout(W); cv.style.height = L.H + 'px'; cv.width = Math.round(W * dpr); cv.height = Math.round(L.H * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0); snap = true; draw();
+}
+function layout(W) {
+  const pad = 12, gap = 8; const cols = W >= 1000 ? 7 : W >= 640 ? 4 : 3; const bw = (W - 2 * pad - (cols - 1) * gap) / cols; const bh = W >= 640 ? 118 : 104;
+  const boxes = {}; ZONES.forEach((z, i) => { const c = i % cols, r = Math.floor(i / cols); boxes[z.key] = { x: pad + c * (bw + gap), y: pad + r * (bh + gap), w: bw, h: bh, ...z }; });
+  const rows = Math.ceil(ZONES.length / cols); let y = pad + rows * (bh + gap) + 6;
+  const side = W >= 760; const exitW = side ? 168 : 0;
+  const nurseY = y; y += 34;
+  const wardW = W - 2 * pad - (side ? exitW + gap : 0);
+  let cw = P.chairs > 40 ? 40 : 50, chh = P.chairs > 40 ? 34 : 42; const cg = 6;
+  let ccols = Math.max(1, Math.floor((wardW + cg) / (cw + cg)));
+  const crows = Math.ceil(P.chairs / ccols);
+  const chairs = []; for (let i = 0; i < P.chairs; i++) chairs.push({ x: pad + (i % ccols) * (cw + cg), y: y + 22 + Math.floor(i / ccols) * (chh + cg), w: cw, h: chh });
+  const wardH = 22 + crows * (chh + cg);
+  const ward = { x: pad, y, w: wardW, h: wardH };
+  let exits;
+  if (side) { const eh = Math.max(70, (wardH + 34 - gap) / 2); exits = { done: { x: W - pad - exitW, y: nurseY, w: exitW, h: eh }, home: { x: W - pad - exitW, y: nurseY + eh + gap, w: exitW, h: eh } }; y += Math.max(wardH, 2 * eh + gap - 34); }
+  else { y += wardH + gap; const ew = (W - 2 * pad - gap) / 2; exits = { done: { x: pad, y, w: ew, h: 80 }, home: { x: pad + ew + gap, y, w: ew, h: 80 } }; y += 80; }
+  return { W, H: y + pad, boxes, chairs, ward, nurse: { x: pad, y: nurseY, w: wardW, h: 28 }, exits, entry: { x: -12, y: boxes.reg.y + bh / 2 } };
+}
+function stateAt(p, t) { // last timeline entry at or before t
+  if (!p.tl || !p.tl.length || p.tl[0][0] > t) return null;
+  let s = null; for (const e of p.tl) { if (e[0] <= t) s = e; else break; } return s;
+}
+function rr(x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function alpha(c, a) { if (c.startsWith('#')) { const [r, g, b] = hex(c); return `rgba(${r},${g},${b},${a})`; } return c; }
+let lastFrame = performance.now();
+function draw() {
+  if (!L || !R) return;
+  const now = performance.now(); const dt = Math.min(0.1, (now - lastFrame) / 1000); lastFrame = now;
+  const W = L.W; ctx.clearRect(0, 0, W, L.H);
+  ctx.font = '700 12px "Atkinson Hyperlegible", system-ui, sans-serif'; ctx.textBaseline = 'alphabetic';
+  // classify patients
+  const inZone = {}; ZONES.forEach(z => inZone[z.key] = []); const inChair = new Map(); const done = [], home = [];
+  let arrived = 0, preChair = 0;
+  for (const p of R.pts) {
+    const s = stateAt(p, T); if (!s) continue; arrived++;
+    let z = s[1]; if (z === 'arrive') z = 'reg';
+    if (z === 'chair') inChair.set(p.chair, { p, sub: s[2], since: s[0] });
+    else if (z === 'done') done.push(p); else if (z === 'home') home.push({ p, why: s[2] });
+    else if (inZone[z]) { inZone[z].push({ p, sub: s[2], since: s[0] }); if (z !== 'chairq') preChair++; }
+  }
+  const targets = new Map();
+  // station boxes
+  for (const z of ZONES) {
+    const b = L.boxes[z.key]; const list = inZone[z.key];
+    const st = P.stages.find(s => s.key === z.key); const cap = z.key === 'chairq' ? null : st.cap;
+    const queued = list.filter(e => e.sub === 'queue').length, serving = list.length - queued;
+    const sev = z.key === 'lab' || z.key === 'bill' ? 0 : queued >= 12 ? 2 : queued >= 5 ? 1 : 0;
+    rr(b.x, b.y, b.w, b.h, 9); ctx.fillStyle = css.panel; ctx.fill();
+    if (sev) { ctx.fillStyle = alpha(sev === 2 ? css.crit : css.warn, sev === 2 ? 0.14 : 0.16); ctx.fill(); }
+    ctx.lineWidth = 1; ctx.strokeStyle = sev === 2 ? css.crit : css.line; ctx.stroke();
+    ctx.fillStyle = css.accent; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.fillText(z.step, b.x + 9, b.y + 17);
+    ctx.fillStyle = css.ink; ctx.font = '700 12.5px "Atkinson Hyperlegible", system-ui, sans-serif';
+    let name = z.name; while (ctx.measureText(name).width > b.w - 30 && name.length > 4) name = name.slice(0, -2) + '…';
+    ctx.fillText(name, b.x + 22, b.y + 17);
+    ctx.fillStyle = css['ink-2']; ctx.font = '11px "JetBrains Mono", monospace';
+    const info = z.key === 'chairq' ? `${list.length} ready` : cap === Infinity ? `${serving} in progress` : `${serving}/${cap} busy · ${queued} queue`;
+    ctx.fillText(info, b.x + 9, b.y + 33);
+    // dots
+    list.sort((a, c) => (a.sub === c.sub ? a.since - c.since : a.sub === 'serve' ? -1 : 1));
+    const dcols = Math.max(1, Math.floor((b.w - 16) / 11)); const drows = Math.max(1, Math.floor((b.h - 46) / 11)); const maxD = dcols * drows;
+    list.forEach((e, j) => { const jj = Math.min(j, maxD - 1); targets.set(e.p.id, { x: b.x + 13 + (jj % dcols) * 11, y: b.y + 47 + Math.floor(jj / dcols) * 11, serve: e.sub === 'serve' && z.key !== 'chairq', hide: j >= maxD }); });
+    if (list.length > maxD) { ctx.fillStyle = css.ink; ctx.font = '700 11px "JetBrains Mono", monospace'; ctx.textAlign = 'right'; ctx.fillText('+' + (list.length - maxD + 1), b.x + b.w - 8, b.y + b.h - 8); ctx.textAlign = 'left'; }
+  }
+  // nurse strip
+  let excl = 0, inf = 0; for (const [, e] of inChair) { if (e.sub === 'setup' || e.sub === 'takedown') excl++; else if (e.sub === 'infusing') inf++; }
+  const nb = L.nurse; ctx.fillStyle = css['ink-2']; ctx.font = '700 11px "Atkinson Hyperlegible", system-ui, sans-serif'; ctx.fillText('NURSES', nb.x, nb.y + 17);
+  const nx0 = nb.x + 56, nW = Math.min(64, (nb.w - 56) / P.nurses - 4);
+  let exLeft = excl, units = inf;
+  for (let n = 0; n < P.nurses; n++) {
+    const x = nx0 + n * (nW + 4), y = nb.y + 4, h = 18;
+    rr(x, y, nW, h, 4); ctx.fillStyle = css.panel; ctx.fill(); ctx.strokeStyle = css['line-2']; ctx.stroke();
+    if (exLeft > 0) { exLeft--; rr(x, y, nW, h, 4); ctx.fillStyle = css['st-setup']; ctx.fill(); }
+    else { const segW = nW / P.monitor; for (let k = 0; k < P.monitor && units > 0; k++, units--) { ctx.fillStyle = css['st-inf']; ctx.fillRect(x + k * segW + 1, y + 2, segW - 2, h - 4); } }
+  }
+  const load = (excl + inf / P.monitor) / P.nurses;
+  ctx.fillStyle = load > 0.999 ? css.crit : css['ink-2']; ctx.font = '11px "JetBrains Mono", monospace';
+  const lx = nx0 + P.nurses * (nW + 4) + 6; if (lx < nb.x + nb.w - 40) ctx.fillText(`${Math.round(load * 100)}%`, lx, nb.y + 17);
+  // ward
+  const wd = L.ward; ctx.fillStyle = css['ink-2']; ctx.font = '700 11px "Atkinson Hyperlegible", system-ui, sans-serif';
+  ctx.fillText(`CHAIRS · 8 Line & pre-meds → 9 Infusion → 10 Takedown & discharge`, wd.x, wd.y + 13);
+  L.chairs.forEach((c, i) => {
+    const e = inChair.get(i);
+    rr(c.x, c.y, c.w, c.h, 7);
+    if (!e) { ctx.fillStyle = css.panel; ctx.fill(); ctx.setLineDash([3, 3]); ctx.strokeStyle = css['line-2']; ctx.stroke(); ctx.setLineDash([]); }
+    else {
+      const colr = { setup: css['st-setup'], infusing: css['st-inf'], blocked: css['st-block'], takedown: css['st-td'], obs: css['st-obs'] }[e.sub] || css.muted;
+      ctx.fillStyle = alpha(colr, 0.22); ctx.fill(); ctx.strokeStyle = colr; ctx.lineWidth = 1.5; ctx.stroke(); ctx.lineWidth = 1;
+      let f = 1; if (e.sub === 'infusing') f = Math.min(1, (T - e.p.drip) / e.p.L); else if (e.sub === 'setup') f = Math.min(1, (T - e.since) / e.p.d.setup);
+      ctx.save(); rr(c.x, c.y, c.w, c.h, 7); ctx.clip(); ctx.fillStyle = alpha(colr, 0.75); ctx.fillRect(c.x, c.y + c.h - 6, c.w * f, 6); ctx.restore();
+      targets.set(e.p.id, { x: c.x + c.w / 2, y: c.y + c.h / 2 - 3, chair: true });
+    }
+    ctx.fillStyle = css.muted; ctx.font = '9px "JetBrains Mono", monospace'; ctx.fillText(String(i + 1), c.x + 4, c.y + 10);
+  });
+  // exits
+  const ex = [['done', 'Treated, gone home', done.map(p => ({ p }))], ['home', 'Not treated today', home]];
+  for (const [k, title, list] of ex) {
+    const b = L.exits[k]; rr(b.x, b.y, b.w, b.h, 9); ctx.fillStyle = css.panel; ctx.fill(); ctx.strokeStyle = css.line; ctx.stroke();
+    ctx.fillStyle = css.ink; ctx.font = '700 12.5px "Atkinson Hyperlegible", system-ui, sans-serif'; ctx.fillText(title, b.x + 9, b.y + 17);
+    ctx.fillStyle = css['ink-2']; ctx.font = '11px "JetBrains Mono", monospace';
+    if (k === 'home') { const u = list.filter(e => e.why === 'unfit').length; ctx.fillText(`${list.length} · ${u} unfit · ${list.length - u} capacity`, b.x + 9, b.y + 32); }
+    else ctx.fillText(`${list.length} patients`, b.x + 9, b.y + 32);
+    const dcols = Math.max(1, Math.floor((b.w - 16) / 9)); const drows = Math.max(1, Math.floor((b.h - 44) / 9)); const maxD = dcols * drows;
+    list.forEach((e, j) => { const jj = Math.min(j, maxD - 1); targets.set(e.p.id, { x: b.x + 12 + (jj % dcols) * 9, y: b.y + 44 + Math.floor(jj / dcols) * 9, small: true, cross: k === 'home', hide: j >= maxD }); });
+  }
+  // dots
+  const k = snap ? 1 : Math.min(1, dt * 9);
+  for (const p of R.pts) {
+    const tg = targets.get(p.id); if (!tg) { disp.delete(p.id); continue; }
+    let d = disp.get(p.id); if (!d) { d = { x: snap ? tg.x : L.entry.x, y: snap ? tg.y : L.entry.y }; disp.set(p.id, d); }
+    d.x += (tg.x - d.x) * k; d.y += (tg.y - d.y) * k;
+    if (tg.hide && Math.hypot(tg.x - d.x, tg.y - d.y) < 2) continue;
+    const r = tg.small ? 3.3 : 4.6; const col = p.cls === 'pre' ? css.pre : css.same;
+    ctx.beginPath(); ctx.arc(d.x, d.y, r + 1.5, 0, Math.PI * 2); ctx.fillStyle = css.panel; ctx.fill();
+    ctx.beginPath(); ctx.arc(d.x, d.y, r, 0, Math.PI * 2); ctx.fillStyle = tg.cross ? alpha(col, 0.45) : col; ctx.fill();
+    if (tg.serve) { ctx.beginPath(); ctx.arc(d.x, d.y, r + 2.6, 0, Math.PI * 2); ctx.strokeStyle = css.ink; ctx.lineWidth = 1.2; ctx.stroke(); ctx.lineWidth = 1; }
+  }
+  snap = false;
+  // live counters
+  const idle = P.chairs - inChair.size;
+  liveSet({ 'Clock': fmtT(Math.max(T, 0)), 'Arrived': `${arrived}/${R.K.n - R.K.noshow}`, 'In steps 1–6': preChair, 'Ready, no chair': inZone.chairq.length, 'In chairs': `${inChair.size}/${P.chairs}`, 'Idle chairs': idle, 'Nurse load': Math.round(load * 100) + '%', 'Treated': done.length, 'Sent home': home.length });
+}
+let liveCache = '';
+function liveSet(o) { const h = Object.entries(o).filter(([k]) => k !== 'Clock').map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join(''); if (h !== liveCache) { $('live').innerHTML = h; liveCache = h; } $('clock').textContent = o.Clock; }
+
+function loop() {
+  if (playing) {
+    const now = performance.now(); const dt = Math.min(0.1, (now - (loop.last || now)) / 1000); loop.last = now;
+    T += dt * speed; if (T >= tEnd) { T = tEnd; setPlaying(false); }
+    $('scrub').value = T; updateNowLines();
+  } else loop.last = performance.now();
+  if (!$('view-live').hidden) draw();
+  requestAnimationFrame(loop);
+}
+function setPlaying(v) { playing = v; $('play').textContent = v ? '❚❚ Pause' : '▶ Play'; $('play').setAttribute('aria-label', v ? 'Pause' : 'Play'); if (v && T >= tEnd - 1) { T = P.open - 10; snap = true; } }
+$('play').addEventListener('click', () => setPlaying(!playing));
+$('scrub').addEventListener('input', () => { const nt = +$('scrub').value; if (Math.abs(nt - T) > 20) snap = true; T = nt; updateNowLines(); });
+$('speed').addEventListener('click', (e) => { const b = e.target.closest('button'); if (!b) return; speed = +b.dataset.s; $('speed').querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x === b ? 'true' : 'false')); });
+// speeds are sim-minutes per real second
+$('speed').querySelectorAll('button').forEach(b => { const s = { 10: 5, 30: 15, 90: 40, 240: 120 }[b.dataset.s]; b.dataset.s = s; b.textContent = s + ' min/s'; });
+cv.addEventListener('mousemove', (e) => {
+  if (!L || !R) return; const r = cv.getBoundingClientRect(); const mx = e.clientX - r.left, my = e.clientY - r.top;
+  for (const p of R.pts) { const d = disp.get(p.id); if (!d) continue; if (Math.hypot(d.x - mx, d.y - my) < 6) {
+    const s = stateAt(p, T);
+    showTip(e, `Patient ${p.id + 1} · ${p.cls === 'pre' ? 'pre-cleared' : 'same-day test'}<br>Told ${fmtT(p.told)} · arrived ${fmtT(p.arrive)}<br>Infusion ${fmtHM(p.L)}${p.slot !== null && p.slot !== undefined ? ` · slot ${fmtT(p.slot)}` : ''}<br>Now: <b>${s ? (s[1] + (s[2] ? ' · ' + s[2] : '')) : ''}</b>`); return; } }
+  hideTip();
+});
+cv.addEventListener('mouseleave', hideTip);
+let rz; window.addEventListener('resize', () => { clearTimeout(rz); rz = setTimeout(() => { resizeFloor(); renderCharts(); rerenderExp(); }, 150); });
+const themeRefresh = () => { readCss(); renderCharts(); rerenderExp(); };
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', themeRefresh);
+new MutationObserver(themeRefresh).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+
+// ---------------- Experiments ----------------
+const EXP = {}; // results cache
+const clone = (o) => JSON.parse(JSON.stringify(o, (k, v) => v === Infinity ? 'Inf' : v), (k, v) => v === 'Inf' ? Infinity : v);
+let expBusy = false;
+async function runExp(which) {
+  if (expBusy) return; expBusy = true;
+  document.querySelectorAll('[data-run], #run-all').forEach(b => b.disabled = true);
+  const days = +$('exp-days').value; const base = clone(P);
+  const list = which === 'all' ? ['sanity', 'e1', 'e2', 'e3', 'e4', 'e5'] : [which];
+  const jobs = [];
+  const J = (exp, key, over, mutate) => { const p = Object.assign(clone(base), over); if (mutate) mutate(p); jobs.push({ exp, key, p }); };
+  for (const w of list) {
+    if (w === 'sanity') J('sanity', 'base', { rule: 'at8_fcfs', preCleared: 0 });
+    if (w === 'e1') for (const r of Object.keys(E.RULES)) J('e1', r, { rule: r });
+    if (w === 'e2') for (const q of [0.5, 0.65, 0.8, 0.95]) J('e2', q, { rule: 'buffer', q });
+    if (w === 'e3') for (let pc = 0; pc <= 1.0001; pc += 0.1) { J('e3', 'buffer|' + pc.toFixed(1), { rule: 'buffer', preCleared: +pc.toFixed(1) }); J('e3', 'at8_fcfs|' + pc.toFixed(1), { rule: 'at8_fcfs', preCleared: +pc.toFixed(1) }); }
+    if (w === 'e4') for (const [lab, over] of [['Spread ×0.5', { spread: 0.5 }], ['Base', {}], ['Spread ×2', { spread: 2 }], ['Lateness ×0.5', { devMult: 0.5 }], ['Lateness ×2', { devMult: 2 }]]) for (const r of ['buffer', 'at8_fcfs']) J('e4', lab + '|' + r, Object.assign({ rule: r }, over));
+    if (w === 'e5') {
+      for (let q = 0.5; q <= 0.951; q += 0.05) J('e5q', +q.toFixed(2), { rule: 'buffer', q: +q.toFixed(2) });
+      J('e5c', 'As is', {});
+      J('e5c', '+1 chair', { chairs: base.chairs + 1 }); J('e5c', '+1 nurse', { nurses: base.nurses + 1 });
+      for (const [k, n] of [['reg', 'registration clerk'], ['blood', 'phlebotomist'], ['doc', 'doctor'], ['pharm', 'pharmacy cabinet']]) J('e5c', '+1 ' + n, {}, p => { const s = p.stages.find(s => s.key === k); if (s.cap !== Infinity) s.cap += 1; });
+      J('e5c', 'Lab 30 min faster', {}, p => { const s = p.stages.find(s => s.key === 'lab'); s.lo -= 30; s.mode -= 30; s.hi -= 30; });
+      J('e5c', 'Billing 15 min faster', {}, p => { const s = p.stages.find(s => s.key === 'bill'); s.lo = Math.max(5, s.lo - 15); s.mode = Math.max(5, s.mode - 15); s.hi = Math.max(5, s.hi - 15); });
+      J('e5c', '+10% pre-cleared', { preCleared: Math.min(1, base.preCleared + 0.1) });
+    }
+  }
+  for (const w of list) { const k = w === 'e5' ? ['e5q', 'e5c'] : [w]; k.forEach(x => EXP[x] = { base, days, res: {} }); }
+  const prog = $('exp-prog'); const t0 = performance.now();
+  for (let i = 0; i < jobs.length; i++) {
+    const j = jobs[i]; $('exp-status').textContent = `${i + 1}/${jobs.length} scenarios`;
+    EXP[j.exp].res[j.key] = await replicateAsync(j.p, days, f => prog.style.width = ((i + f) / jobs.length * 100) + '%');
+    renderExp(j.exp === 'e5q' || j.exp === 'e5c' ? 'e5' : j.exp);
+  }
+  prog.style.width = '100%'; $('exp-status').textContent = `Done in ${((performance.now() - t0) / 1000).toFixed(1)} s · ${jobs.length * days} simulated days`;
+  setTimeout(() => prog.style.width = '0', 900);
+  document.querySelectorAll('[data-run], #run-all').forEach(b => b.disabled = false); expBusy = false;
+}
+document.querySelectorAll('[data-run]').forEach(b => b.addEventListener('click', () => runExp(b.dataset.run)));
+$('run-all').addEventListener('click', () => runExp('all'));
+function rerenderExp() { if ($('view-exp').hidden) return; for (const k of ['sanity', 'e1', 'e2', 'e3', 'e4', 'e5']) if (EXP[k] || (k === 'e5' && EXP.e5q)) renderExp(k); }
+const ci = (s, f = v => v.toFixed(1)) => `${f(s.m)} <span style="color:var(--muted)">± ${f(s.hw)}</span>`;
+const hrs = v => (v / 60).toFixed(2);
+
+function renderExp(k) {
+  if (k === 'sanity') {
+    const s = EXP.sanity.res.base; if (!s) return; const el = $('out-sanity');
+    const w = s.waitMean.m / 60, gap = w - 3.5;
+    el.className = '';
+    el.innerHTML = `<div class="kpis"><div class="kpi"><div class="k">Model mean wait</div><div class="v">${w.toFixed(2)} <small>h</small></div><div class="d">± ${(s.waitMean.hw / 60).toFixed(2)} h over ${s.days} days</div></div>
+      <div class="kpi"><div class="k">Kochi baseline</div><div class="v">3.50 <small>h</small></div><div class="d">Pavithran et al. 2025, phase I</div></div>
+      <div class="kpi"><div class="k">Gap <span class="pill ${Math.abs(gap) <= 0.5 ? 'good' : Math.abs(gap) <= 1.2 ? 'warn' : 'crit'}">${Math.abs(gap) <= 0.5 ? 'Calibrated' : 'Off'}</span></div><div class="v">${gap >= 0 ? '+' : ''}${gap.toFixed(2)} <small>h</small></div><div class="d">P90 ${hrs(s.waitP90.m)} h · chair queue ${s.chairWait.m.toFixed(0)} min</div></div></div>
+      <div class="finding">${Math.abs(gap) <= 0.5 ? 'The assumed stage times reproduce the Kochi baseline within half an hour.' : gap > 0 ? `The model waits ${gap.toFixed(1)} h longer than Kochi. The stage means alone add up to about 3 h 20 before the drip, so every queue (registration rush at 8 am, the chair queue at 11:00) pushes past 3.5 h. Either Indian stage times sit at the low end of the assumed ranges, Kochi books fewer patients per chair, or Kochi's "wait" excludes some steps. Lower the booked share or the stage modes until the gap closes, and use the TMH time stamps to decide which.` : 'The model waits less than Kochi: the assumed stage times are too short or the unit too lightly booked.'}</div>`;
+  }
+  if (k === 'e1') {
+    const R1 = EXP.e1.res; const keys = Object.keys(E.RULES).filter(r => R1[r]); if (!keys.length) return; const el = $('out-e1'); el.className = '';
+    const metrics = [['waitMean', 'Mean wait to drip (h)', v => v / 60], ['idleChair', 'Idle chair-hours', v => v], ['overtime', 'Overtime (min)', v => v], ['notTreated', 'Not treated (patients)', v => v], ['cost', 'Weighted cost', v => v]];
+    el.innerHTML = `<div class="minis">${metrics.map((m, i) => `<div class="mini"><h3>${m[1]}</h3><div class="chart" id="e1-${i}"></div></div>`).join('')}</div>
+      <div class="tbl-wrap" style="margin-top:12px"><table class="data"><tr><th>Rule</th><th>Wait h</th><th>P90 h</th><th>Chair queue min</th><th>Idle chair-h</th><th>Starved chair-h</th><th>Overtime min</th><th>Not treated</th><th>Cost</th></tr>
+      ${keys.map(r => { const s = R1[r]; return `<tr class="${r === bestKey(R1, keys) ? 'best' : ''}"><td>${E.RULES[r].name}</td><td>${ci(s.waitMean, hrs)}</td><td>${hrs(s.waitP90.m)}</td><td>${s.chairWait.m.toFixed(0)}</td><td>${ci(s.idleChair, v => v.toFixed(0))}</td><td>${s.starve.m.toFixed(0)}</td><td>${ci(s.overtime, v => v.toFixed(0))}</td><td>${ci(s.notTreated)}</td><td>${ci(s.cost, v => v.toFixed(2))}</td></tr>`; }).join('')}</table></div>
+      <div class="finding" id="e1-find"></div>`;
+    metrics.forEach((m, i) => barCI($('e1-' + i), keys.map(r => ({ label: E.RULES[r].short, m: m[2](R1[r][m[0]].m), hw: m[2](R1[r][m[0]].hw), hl: r === 'buffer' }))));
+    if (R1.buffer && R1.at8_fcfs) { const b = R1.buffer, a = R1.at8_fcfs; const best = bestKey(R1, keys);
+      $('e1-find').innerHTML = `Against everyone-at-8-am, the buffer rule changes mean wait by <b>${((b.waitMean.m - a.waitMean.m) / 60).toFixed(2)} h</b>, idle chairs by <b>${(b.idleChair.m - a.idleChair.m).toFixed(0)} chair-h</b>, overtime by <b>${(b.overtime.m - a.overtime.m).toFixed(0)} min</b> and patients not treated by <b>${(b.notTreated.m - a.notTreated.m).toFixed(1)}</b>. Lowest weighted cost: <b>${E.RULES[best].name}</b>.`; }
+  }
+  if (k === 'e2') {
+    const R2 = EXP.e2.res; const qs = Object.keys(R2).map(Number).sort(); if (!qs.length) return; const el = $('out-e2'); el.className = '';
+    el.innerHTML = `<div class="chart" id="e2-c"></div><div class="tbl-wrap"><table class="data"><tr><th>q</th><th>B pre</th><th>B same-day</th><th>Wait h</th><th>Idle chair-h</th><th>OT min</th><th>Cost</th></tr>
+      ${qs.map(q => { const s = R2[q]; return `<tr class="${q === +bestKey(R2, qs) ? 'best' : ''}"><td>${Math.round(q * 100)}%</td><td>${fmtHM(s.B.pre)}</td><td>${fmtHM(s.B.same)}</td><td>${ci(s.waitMean, hrs)}</td><td>${ci(s.idleChair, v => v.toFixed(0))}</td><td>${s.overtime.m.toFixed(0)}</td><td>${ci(s.cost, v => v.toFixed(2))}</td></tr>`; }).join('')}</table></div>
+      <div class="finding">Bigger buffers tell patients to come earlier relative to their chair slot. Read the chart from left to right: the q with the lowest cost is highlighted in the table. If the points barely move, the spread of D is small under current inputs and the buffer size matters less than capacity and pre-clearance.</div>`;
+    scatter($('e2-c'), qs.map(q => ({ x: R2[q].idleChair.m, y: R2[q].waitMean.m / 60, xhw: R2[q].idleChair.hw, yhw: R2[q].waitMean.hw / 60, label: 'q ' + Math.round(q * 100) + '%' })), 'Idle chair-hours per day', 'Mean wait (h)');
+  }
+  if (k === 'e3') {
+    const R3 = EXP.e3.res; const el = $('out-e3'); el.className = '';
+    const pcs = [...new Set(Object.keys(R3).map(k => +k.split('|')[1]))].sort((a, b) => a - b);
+    const ser = [['buffer', 'Buffer rule', css.accent], ['at8_fcfs', 'Everyone at 8 am', css['ink-2']]].map(([r, n, c]) => ({ name: n, color: c, pts: pcs.filter(p => R3[r + '|' + p.toFixed(1)]).map(p => ({ x: p * 100, y: R3[r + '|' + p.toFixed(1)].waitMean.m / 60, hw: R3[r + '|' + p.toFixed(1)].waitMean.hw / 60 })) }));
+    el.innerHTML = `<div class="chart" id="e3-c"></div><div class="finding" id="e3-f"></div>`;
+    xyLines($('e3-c'), ser, 'Pre-cleared share (%)', 'Mean wait (h)', 100);
+    const b = ser[0].pts; let knee = null;
+    for (let i = 1; i < b.length; i++) { if (b[i - 1].y - b[i].y < 5 / 60) { knee = b[i - 1].x; break; } }
+    if (b.length > 2) $('e3-f').innerHTML = knee !== null ? `Under the buffer rule, waiting stops improving by more than 5 minutes per extra 10% pre-cleared at about <b>${knee.toFixed(0)}%</b>.` : `Waiting keeps improving all the way to 100% pre-cleared: every patient moved to the day before saves more than 5 minutes per 10% step. Wait goes from ${b[0].y.toFixed(2)} h to ${b[b.length - 1].y.toFixed(2)} h.`;
+  }
+  if (k === 'e4') {
+    const R4 = EXP.e4.res; const el = $('out-e4'); el.className = '';
+    const labs = [...new Set(Object.keys(R4).map(k => k.split('|')[0]))];
+    el.innerHTML = `<div class="tbl-wrap"><table class="data"><tr><th>Inputs</th><th>Buffer: wait h</th><th>Buffer: idle chair-h</th><th>Buffer: OT min</th><th>Buffer: cost</th><th>8 am: wait h</th><th>8 am: cost</th><th>Cost advantage</th></tr>
+      ${labs.map(l => { const b = R4[l + '|buffer'], a = R4[l + '|at8_fcfs']; if (!b || !a) return ''; const adv = a.cost.m - b.cost.m; return `<tr><td>${l}</td><td>${ci(b.waitMean, hrs)}</td><td>${b.idleChair.m.toFixed(0)}</td><td>${b.overtime.m.toFixed(0)}</td><td>${ci(b.cost, v => v.toFixed(2))}</td><td>${ci(a.waitMean, hrs)}</td><td>${a.cost.m.toFixed(2)}</td><td><span class="pill ${adv > 0 ? 'good' : 'crit'}">${adv > 0 ? 'Buffer wins' : '8 am wins'}</span> ${adv.toFixed(2)}</td></tr>`; }).join('')}</table></div>
+      <div class="finding">The buffer is re-estimated for each input set from pilot days, as it would be once real data replaced the assumptions. A rule that wins in every row is robust to the spread we have not measured yet.</div>`;
+  }
+  if (k === 'e5') {
+    const Rq = EXP.e5q ? EXP.e5q.res : {}, Rc = EXP.e5c ? EXP.e5c.res : {}; const el = $('out-e5'); el.className = '';
+    const qs = Object.keys(Rq).map(Number).sort((a, b) => a - b);
+    const base = Rc['As is'];
+    const moves = Object.keys(Rc).filter(k => k !== 'As is');
+    const bq = qs.length ? +bestKey(Rq, qs) : null;
+    el.innerHTML = `<div class="two"><div><h3 style="font-size:14px">Cost against q (buffer rule)</h3><div class="chart" id="e5-q"></div>${bq !== null ? `<div class="finding">Best q on this grid: <b>${Math.round(bq * 100)}%</b> (cost ${Rq[bq].cost.m.toFixed(2)} ± ${Rq[bq].cost.hw.toFixed(2)}). Buffers: pre-cleared ${fmtHM(Rq[bq].B.pre)}, same-day ${fmtHM(Rq[bq].B.same)}.</div>` : ''}</div>
+      <div><h3 style="font-size:14px">One extra unit of capacity, current rule</h3><div class="tbl-wrap"><table class="data"><tr><th>Change</th><th>Wait h</th><th>Idle chair-h</th><th>OT min</th><th>Cost</th><th>Δ cost</th></tr>
+      ${base ? `<tr><td>As is</td><td>${hrs(base.waitMean.m)}</td><td>${base.idleChair.m.toFixed(0)}</td><td>${base.overtime.m.toFixed(0)}</td><td>${base.cost.m.toFixed(2)}</td><td>—</td></tr>` : ''}
+      ${base ? moves.filter(m => Rc[m]).sort((a, b) => Rc[a].cost.m - Rc[b].cost.m).map((m, i) => { const s = Rc[m]; const d = s.cost.m - base.cost.m; return `<tr class="${i === 0 ? 'best' : ''}"><td>${m}</td><td>${hrs(s.waitMean.m)}</td><td>${s.idleChair.m.toFixed(0)}</td><td>${s.overtime.m.toFixed(0)}</td><td>${s.cost.m.toFixed(2)}</td><td>${d >= 0 ? '+' : ''}${d.toFixed(2)}</td></tr>`; }).join('') : ''}</table></div>
+      <div class="finding" id="e5-f"></div></div></div>`;
+    if (qs.length) xyLines($('e5-q'), [{ name: 'Cost', color: css.accent, pts: qs.map(q => ({ x: q * 100, y: Rq[q].cost.m, hw: Rq[q].cost.hw })) }], 'q (%)', 'Weighted cost', null, 50);
+    if (base && moves.length >= 9) { const top = moves.sort((a, b) => Rc[a].cost.m - Rc[b].cost.m)[0]; $('e5-f').innerHTML = `The binding resource right now: <b>${top}</b> buys the largest cost drop (${(Rc[top].cost.m - base.cost.m).toFixed(2)}). Changes with Δ ≈ 0 are not bottlenecks today.`; }
+  }
+}
+function bestKey(Rm, keys) { let b = keys[0]; for (const k of keys) if (Rm[k] && Rm[k].cost.m < Rm[b].cost.m) b = k; return b; }
+function barCI(el, items) {
+  const W = Math.max(230, el.clientWidth || 260), rh = 24, lw = 104, H = items.length * rh + 8; const svg = svgBox(el, W, H);
+  const max = niceMax(Math.max(...items.map(i => i.m + i.hw), 0.01)); const x = v => lw + v / max * (W - lw - 46);
+  items.forEach((it, i) => {
+    const y = 4 + i * rh; const t = S('text', { x: lw - 6, y: y + 14, 'text-anchor': 'end' }, svg); t.textContent = it.label; if (it.hl) { t.style.fill = css.ink; t.style.fontWeight = 700; }
+    const r = S('rect', { x: lw, y: y + 4, width: Math.max(2, x(it.m) - lw), height: 14, rx: 3, fill: it.hl ? css.accent : css['st-obs'] }, svg);
+    S('line', { x1: x(it.m - it.hw), x2: x(it.m + it.hw), y1: y + 11, y2: y + 11, stroke: css.ink, 'stroke-width': 1.5 }, svg);
+    const v = S('text', { x: x(it.m + it.hw) + 5, y: y + 15 }, svg); v.textContent = it.m >= 100 ? it.m.toFixed(0) : it.m.toFixed(it.m >= 10 ? 1 : 2);
+    r.addEventListener('mousemove', e => showTip(e, `${it.label}<br><b>${it.m.toFixed(2)}</b> ± ${it.hw.toFixed(2)} (95% CI)`)); r.addEventListener('mouseleave', hideTip);
+  });
+}
+function scatter(el, pts, xl, yl) {
+  const W = Math.max(300, el.clientWidth || 480), H = 250, m = { l: 46, r: 20, t: 26, b: 36 }; const svg = svgBox(el, W, H);
+  const xs = pts.map(p => p.x), ys = pts.map(p => p.y);
+  const xmin = Math.min(...xs) * 0.95, xmax = Math.max(...xs) * 1.05 || 1, ymin = Math.min(...ys) * 0.95, ymax = Math.max(...ys) * 1.05 || 1;
+  const x = v => m.l + (v - xmin) / (xmax - xmin || 1) * (W - m.l - m.r), y = v => H - m.b - (v - ymin) / (ymax - ymin || 1) * (H - m.t - m.b);
+  const g = S('g', { class: 'grid' }, svg);
+  for (let i = 0; i <= 4; i++) { const v = ymin + (ymax - ymin) * i / 4; S('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, g); const t = S('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, g); t.textContent = v.toFixed(2); }
+  for (let i = 0; i <= 4; i++) { const v = xmin + (xmax - xmin) * i / 4; const t = S('text', { x: x(v), y: H - m.b + 14, 'text-anchor': 'middle' }, g); t.textContent = v.toFixed(0); }
+  const xt = S('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, svg); xt.textContent = xl;
+  const yt = S('text', { x: 4, y: 11 }, svg); yt.textContent = yl;
+  S('path', { d: 'M' + pts.map(p => `${x(p.x)},${y(p.y)}`).join('L'), fill: 'none', stroke: css['line-2'], 'stroke-width': 2 }, svg);
+  pts.forEach(p => { S('line', { x1: x(p.x), x2: x(p.x), y1: y(p.y - p.yhw), y2: y(p.y + p.yhw), stroke: css['ink-2'] }, svg);
+    const c = S('circle', { cx: x(p.x), cy: y(p.y), r: 5, fill: css.accent, stroke: css.panel, 'stroke-width': 2 }, svg);
+    const t = S('text', { x: x(p.x) + 8, y: y(p.y) - 7 }, svg); t.textContent = p.label;
+    c.addEventListener('mousemove', e => showTip(e, `${p.label}<br>Idle <b>${p.x.toFixed(1)}</b> chair-h · wait <b>${p.y.toFixed(2)} h</b>`)); c.addEventListener('mouseleave', hideTip); });
+}
+function xyLines(el, series, xl, yl, xMaxIn, xMinIn) {
+  const W = Math.max(300, el.clientWidth || 480), H = 250, m = { l: 46, r: 110, t: 26, b: 36 }; const svg = svgBox(el, W, H);
+  const all = series.flatMap(s => s.pts); if (!all.length) return;
+  const xmin = xMinIn ?? Math.min(...all.map(p => p.x)), xmax = xMaxIn ?? Math.max(...all.map(p => p.x));
+  const ymax = niceMax(Math.max(...all.map(p => p.y + (p.hw || 0)))); const ymin = 0;
+  const x = v => m.l + (v - xmin) / (xmax - xmin || 1) * (W - m.l - m.r), y = v => H - m.b - (v - ymin) / (ymax - ymin) * (H - m.t - m.b);
+  const g = S('g', { class: 'grid' }, svg);
+  for (let i = 0; i <= 4; i++) { const v = ymax * i / 4; S('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v) }, g); const t = S('text', { x: m.l - 6, y: y(v) + 3.5, 'text-anchor': 'end' }, g); t.textContent = v.toFixed(ymax < 5 ? 1 : 0); }
+  const xsU = [...new Set(all.map(p => p.x))].sort((a, b) => a - b);
+  xsU.forEach((v, i) => { if (xsU.length > 8 && i % 2) return; const t = S('text', { x: x(v), y: H - m.b + 14, 'text-anchor': 'middle' }, g); t.textContent = Math.round(v); });
+  const xt = S('text', { x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle' }, svg); xt.textContent = xl;
+  const yt = S('text', { x: 4, y: 11 }, svg); yt.textContent = yl;
+  const labs = [];
+  series.forEach(s => {
+    if (!s.pts.length) return;
+    S('path', { d: 'M' + s.pts.map(p => `${x(p.x)},${y(p.y + p.hw)}`).join('L') + 'L' + s.pts.slice().reverse().map(p => `${x(p.x)},${y(p.y - p.hw)}`).join('L') + 'Z', fill: s.color, 'fill-opacity': 0.13 }, svg);
+    S('path', { d: 'M' + s.pts.map(p => `${x(p.x)},${y(p.y)}`).join('L'), fill: 'none', stroke: s.color, 'stroke-width': 2 }, svg);
+    s.pts.forEach(p => { const c = S('circle', { cx: x(p.x), cy: y(p.y), r: 4, fill: s.color, stroke: css.panel, 'stroke-width': 2 }, svg);
+      c.addEventListener('mousemove', e => showTip(e, `${s.name} · ${xl.split(' (')[0]} ${Math.round(p.x)}<br><b>${p.y.toFixed(2)}</b> ± ${p.hw.toFixed(2)}`)); c.addEventListener('mouseleave', hideTip); });
+    const lp = s.pts[s.pts.length - 1]; labs.push({ y: y(lp.y), name: s.name, x: x(lp.x) });
+  });
+  labs.sort((a, b) => a.y - b.y); let ly = -99; labs.forEach(l => { const yy = Math.max(l.y, ly + 14); ly = yy; const t = S('text', { x: l.x + 9, y: yy + 4 }, svg); t.textContent = l.name; });
+}
+
+// ---------------- Model tab ----------------
+function renderModel() {
+  const stat = (s) => { const src = s.src.toLowerCase(); return src.includes('borrowed') || src.includes('hesaraki') || src.includes('athawale') ? 'borrowed' : 'assumed'; };
+  const rows = P.stages.map(s => `<tr><td>${s.step}. ${s.name}</td><td>Tri(${s.lo}, ${s.mode}, ${s.hi}) min${s.cap === null ? ' · nurse' : s.cap === Infinity ? ' · no queue' : ` · ${s.cap} servers`}</td><td><span class="tag ${stat(s)}">${stat(s)}</span></td></tr>`).join('') +
+    `<tr><td>Infusion length</td><td>30 min – 6 h, mix ${P.mix.map(m => Math.round(m.w * 100) + '%').join(' / ')}</td><td><span class="tag borrowed">Borrowed</span></td></tr>
+     <tr><td>Arrival deviation</td><td>Uniform −${P.devEarly} to +${P.devLate} min</td><td><span class="tag placeholder">Placeholder</span></td></tr>
+     <tr><td>Nurse rule</td><td>1 setup or takedown, or monitor ${P.monitor}</td><td><span class="tag borrowed">Borrowed</span></td></tr>
+     <tr><td>Unit, base case</td><td>${P.chairs} chairs, ${P.nurses} nurses, ${fmtT(P.open)}–${fmtT(P.close)}, ${Math.round(P.fill * 100)}% booked</td><td><span class="tag assumed">Assumed</span></td></tr>
+     <tr><td>Unfit at review</td><td>${Math.round(P.unfit * 100)}% of same-day patients</td><td><span class="tag placeholder">Placeholder</span></td></tr>
+     <tr><td>No-shows</td><td>${Math.round(P.noShow * 100)}%</td><td><span class="tag placeholder">Placeholder</span></td></tr>
+     <tr><td>Baseline wait</td><td>3.5 h, Kochi, 1,029 patients</td><td><span class="tag measured">Measured</span></td></tr>`;
+  $('src-tbl').innerHTML = '<tr><th>Input</th><th>Value used now</th><th>Status</th></tr>' + rows;
+  const papers = [
+    ['Hesaraki, Dellaert & de Kok', 2019, 'Generating outpatient chemotherapy appointment templates with balanced flowtime and makespan. European Journal of Operational Research 275(1).', 'Integer program for an empty slot template. A nurse is fully assigned during setup and shares monitoring of several patients during infusion.', 'The chair and nurse limits in the template builder: M·setups + drips ≤ M·N, chairs ≤ K, on a 5-minute grid.', 'https://ideas.repec.org/a/eee/ejores/v275y2019i1p304-318.html'],
+    ['Hesaraki et al.', 2020, 'Integrating nurse assignment in outpatient chemotherapy appointment scheduling. OR Spectrum 42.', 'Each patient has a ready time; the chair starts as close to it as possible.', 'Ready time becomes random here. The slot is told arrival + the q-quantile of D.', 'https://ideas.repec.org/a/spr/orspec/v42y2020i4d10.1007_s00291-020-00596-8.html'],
+    ['Liang, Turkcan, Ceyhan & Stuart', 2015, 'Improvement of chemotherapy patient flow and scheduling in an outpatient oncology clinic. International Journal of Production Research 53(24).', 'Discrete-event simulation of lab, oncologist, pharmacy and infusion, plus a mathematical program that balances appointments. Better scheduling alone cut waiting and clinic hours.', 'The architecture: generate the schedule, then stress-test it in a simulation of every stage.', 'https://ideas.repec.org/a/taf/tprsxx/v53y2015i24p7177-7190.html'],
+    ['Hadid et al.', 2022, 'Clustering and stochastic simulation optimization for outpatient chemotherapy appointment planning and scheduling. IJERPH 19(23).', 'Simulation-based multi-objective optimisation with every stage random, unpunctual patients and baseline sequencing rules. Searching every appointment is slow.', 'The baselines (everyone at 8 am, longest/shortest first) and the choice to tune one buffer instead of every appointment.', 'https://www.ncbi.nlm.nih.gov/pmc/articles/PMC9736607/'],
+    ['Athawale', 2015, 'PhD thesis, University of Akron (shared by our mentor).', 'Splits each appointment into setup, infusion and takedown. Nurse workload peaks at the start and end, not evenly.', 'Takedown is a separate nurse-exclusive step; chair blocking and the nurse-load curve come from this.', null],
+    ['Pavithran et al.', 2025, 'Reducing chemotherapy waiting times at a comprehensive cancer centre through telephonic triaging. IJCMPH. Amrita, Kochi, 1,029 patients.', 'DMAIC project: phone triage of labs and fitness the day before, pre-prepared orders, early slots for long infusions and long-distance patients. Wait fell from 3.5 h to 2.4 h, then 1.6 h.', 'The pre-cleared class, the pre-compounding switch, longest-first template order, and the 3.5 h sanity check.', 'https://www.ijcmph.com/index.php/ijcmph/article/view/13546'],
+  ];
+  $('papers').innerHTML = papers.map(([a, y, t, what, use, url]) => `<div class="paper"><span class="yr">${y}</span><h3>${a}</h3><p>${t}</p><p><b>What they do.</b> ${what}</p><div class="use"><b>In this simulator.</b> ${use}${url ? ` <a href="${url}" target="_blank" rel="noopener">Source</a>` : ''}</div></div>`).join('');
+}
+
+// ---------------- Boot ----------------
+applyPreset('base');
+runDay(); renderModel();
+requestAnimationFrame(loop);
+setTimeout(() => { setPlaying(true); }, 600);
+})();
+</script>
