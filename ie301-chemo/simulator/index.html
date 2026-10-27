@@ -250,8 +250,8 @@ table.data tr.best td { background: var(--accent-soft); }
       <div class="grp-body">
         <div class="field"><label for="preset">Preset</label>
           <select id="preset">
-            <option value="base">P3 base case · 20 chairs, 80% booked</option>
-            <option value="feasible">Lighter book · 60% of chair-hours</option>
+            <option value="base">Base case · 20 chairs, 8 nurses, 60% booked</option>
+            <option value="feasible">Presentation 3 load · 6 nurses, 80% booked (overloaded)</option>
             <option value="sanity">Sanity check · all at 8 am, none pre-cleared</option>
             <option value="kochi3">Kochi phase III · phone triage + pre-made orders</option>
             <option value="tmh">TMH-scale · 75 chairs, 18 nurses</option>
@@ -493,7 +493,7 @@ minimise    w₁·wait + w₂·idle chair time + w₃·overtime + w₄·sent hom
           <li><b>Wait</b>: actual arrival to start of drip, mean and 90th percentile, per class and per infusion length (equity).</li>
           <li><b>Idle chair-hours</b> inside opening hours, split into starvation (patients still in steps 1–6), nurse-bound (ready patient, no nurse) and no demand.</li>
           <li><b>Overtime</b>: last patient out minus closing time.</li>
-          <li><b>Not treated on booked day</b>: unfit at review, sent home for capacity, no-shows, and standby patients the template could not fit.</li>
+          <li><b>Not treated on booked day</b>: unfit at review (pre-cleared ones are known the day before and never come in), sent home for capacity, and no-shows.</li>
           <li><b>Nurse saturation</b>: hours in opening time when no nurse could start a new setup.</li>
           <li><b>Chair blocking</b>: minutes a finished patient sat waiting for a nurse to take the line down.</li>
         </ul>
@@ -526,7 +526,7 @@ const Engine = (() => {
   }
   // Triangular inverse CDF, with the spread around the mode scaled by f
   function tri(u, lo, mode, hi, f = 1) {
-    const a = mode - (mode - lo) * f, b = mode + (hi - mode) * f;
+    const a = lo >= 0 ? Math.max(0, mode - (mode - lo) * f) : mode - (mode - lo) * f, b = mode + (hi - mode) * f;
     if (b <= a) return mode;
     const c = (mode - a) / (b - a);
     return u < c ? a + Math.sqrt(u * (b - a) * (mode - a)) : b - Math.sqrt((1 - u) * (b - a) * (b - mode));
@@ -535,11 +535,11 @@ const Engine = (() => {
 
   const STAGES = [
     { key: 'reg', name: 'Registration', step: 1, lo: 5, mode: 10, hi: 15, cap: 3, src: 'Assumed (P3 slide 9)' },
-    { key: 'blood', name: 'Blood draw', step: 2, lo: 5, mode: 7, hi: 10, cap: 4, src: 'Assumed; shared hospital counter (TMH visit)' },
+    { key: 'blood', name: 'Blood draw', step: 2, lo: 5, mode: 7.5, hi: 10, cap: 4, src: 'Assumed; shared hospital counter (TMH visit)' },
     { key: 'lab', name: 'Lab result', step: 3, lo: 60, mode: 90, hi: 120, cap: Infinity, src: 'Assumed 60–120; triangular shape borrowed' },
     { key: 'doc', name: 'Doctor review', step: 4, lo: 10, mode: 15, hi: 20, cap: 4, src: 'Assumed (P3 slide 9)' },
     { key: 'bill', name: 'Billing, insurance', step: 5, lo: 30, mode: 45, hi: 60, cap: Infinity, src: 'Assumed 30–60; elapsed approval time' },
-    { key: 'pharm', name: 'Drug prepared', step: 6, lo: 15, mode: 22, hi: 30, cap: 3, src: 'Assumed 15–30; compounding cabinets' },
+    { key: 'pharm', name: 'Drug prepared', step: 6, lo: 15, mode: 22.5, hi: 30, cap: 3, src: 'Assumed 15–30; compounding cabinets' },
     { key: 'setup', name: 'Line, pre-meds', step: 8, lo: 20, mode: 30, hi: 40, cap: null, src: 'Assumed; nurse exclusive (Hesaraki 2019)' },
     { key: 'takedown', name: 'Takedown', step: 10, lo: 5, mode: 7, hi: 10, cap: null, src: 'Nurse exclusive at end (Athawale 2015)' },
     { key: 'obs', name: 'Observation, discharge', step: 10, lo: 10, mode: 15, hi: 20, cap: null, src: 'Discharge 15–30 total incl. takedown' },
@@ -563,8 +563,8 @@ const Engine = (() => {
 
   function defaultParams() {
     return {
-      chairs: 20, nurses: 6, monitor: 4, open: 480, close: 1080, maxOT: 120,
-      fill: 0.8, preCleared: 0.3, unfit: 0.08, noShow: 0.04,
+      chairs: 20, nurses: 8, monitor: 4, open: 480, close: 1080, maxOT: 120,
+      fill: 0.6, preCleared: 0.3, unfit: 0.08, noShow: 0.04,
       devEarly: 30, devLate: 30, devMult: 1, spread: 1,
       rule: 'buffer', q: 0.8, templateOrder: 'lpt', allowEarly: true, precompound: false,
       takedownFirst: true,
@@ -602,12 +602,12 @@ const Engine = (() => {
     for (let i = 0; i < n; i++) {
       const dev = devFrom(P, r());
       const reg = dur(P, 'reg', r()), bl = dur(P, 'blood', r()), lab = dur(P, 'lab', r()), doc = dur(P, 'doc', r()), bill = dur(P, 'bill', r()), ph = dur(P, 'pharm', r());
-      const devP = Math.max(dev, 0);
+      const devP = dev;
       out.same.push(devP + reg + bl + lab + doc + bill + ph);
       out.pre.push(devP + reg + bill + (P.precompound ? 0 : ph));
     }
     out.pre.sort((a, b) => a - b); out.same.sort((a, b) => a - b);
-    const qf = (arr, q) => arr[Math.min(arr.length - 1, Math.floor(q * arr.length))];
+    const qf = (arr, q) => arr[Math.max(0, Math.min(arr.length - 1, Math.ceil(q * arr.length) - 1))];
     const mean = (arr) => arr.reduce((a, b) => a + b, 0) / arr.length;
     return { pre: out.pre, same: out.same, B: { pre: qf(out.pre, P.q), same: qf(out.same, P.q) }, mean: { pre: mean(out.pre), same: mean(out.same) }, src: 'no-queue Monte Carlo' };
   }
@@ -616,7 +616,7 @@ const Engine = (() => {
   function calibrate(P, pilots = 24, iters = 2) {
     let DQ = delayQuantiles(P);
     if (P.rule !== 'buffer' && P.rule !== 'tmpl_mean') return DQ;
-    const qf = (arr, q) => arr.length ? arr[Math.min(arr.length - 1, Math.floor(q * arr.length))] : 0;
+    const qf = (arr, q) => arr.length ? arr[Math.max(0, Math.min(arr.length - 1, Math.ceil(q * arr.length) - 1))] : 0;
     const mean = (arr) => arr.reduce((a, b) => a + b, 0) / Math.max(1, arr.length);
     for (let it = 0; it < iters; it++) {
       const D = { pre: [], same: [] };
@@ -630,15 +630,15 @@ const Engine = (() => {
     }
     return DQ;
   }
-  function devFrom(P, u) { // uniform between -early and +late, scaled
-    return (-P.devEarly + u * (P.devEarly + P.devLate)) * P.devMult;
+  function devFrom(P, u) { // triangular(-early, 0, +late), scaled: Presentation 3 placeholder Tri(-30, 0, 30)
+    return tri(u, -P.devEarly * P.devMult, 0, P.devLate * P.devMult);
   }
 
   // ---- Booking rules: told arrival a_i and planned chair slot s_i ----
   function book(P, pts, DQ) {
     const isPre = (p) => p.uClass < P.preCleared;
     const rule = P.rule;
-    pts.forEach(p => { p.cls = isPre(p) ? 'pre' : 'same'; p.slot = null; p.chairPlan = null; p.overflow = false; p.otPlan = false; });
+    pts.forEach(p => { p.cls = isPre(p) ? 'pre' : 'same'; p.priorUnfit = p.cls === 'pre' && p.uUnfit < P.unfit; p.slot = null; p.chairPlan = null; p.overflow = false; p.otPlan = false; });
     if (rule.startsWith('at8')) { pts.forEach(p => { p.told = P.open; }); return; }
     if (rule === 'buckets') { pts.forEach(p => { p.told = p.L >= 240 ? P.open : p.L >= 120 ? P.open + 60 : P.open + 180; }); return; }
     // Template (Hesaraki 2019 limits): chairs <= K, M*setups + infusing <= M*N, on a 5-min grid.
@@ -648,7 +648,7 @@ const Engine = (() => {
     const chairFree = Array.from({ length: P.chairs }, () => new Uint8Array(n));
     const excl = new Float32Array(n), inf = new Float32Array(n);
     const sM = triMean(stg(P, 'setup')), tM = triMean(stg(P, 'takedown')), oM = triMean(stg(P, 'obs'));
-    const order = pts.slice();
+    const order = pts.filter(p => !p.priorUnfit);
     if (P.templateOrder === 'lpt') order.sort((a, b) => b.L - a.L);
     else if (P.templateOrder === 'spt') order.sort((a, b) => a.L - b.L);
     else if (P.templateOrder === 'same_first') order.sort((a, b) => (a.cls === b.cls ? b.L - a.L : a.cls === 'same' ? -1 : 1));
@@ -716,8 +716,9 @@ const Engine = (() => {
       if (b > a) {
         const fc = freeChairs(), dt = b - a;
         idleChairMin += fc * dt; occChairMin += (P.chairs - fc) * dt;
-        if (fc > 0 && readyQ.length === 0 && pipeline > 0) starveMin += fc * dt;
-        if (fc > 0 && readyQ.length > 0) nurseBoundMin += fc * dt;
+        const elig = (P.allowEarly || P.rule === 'buckets' || P.rule.startsWith('at8')) ? readyQ.length : readyQ.filter(p => p.slot === null || p.slot <= a).length;
+        const nb = Math.min(fc, elig), sv = Math.min(fc - nb, pipeline);
+        nurseBoundMin += nb * dt; starveMin += sv * dt;
       }
       if (b > a && excl + 1 + infusing / P.monitor > P.nurses + 1e-9) nurseSatMin += b - a;
       if (t > lastT) nurseLoadInt += ((excl + infusing / P.monitor) / P.nurses) * (t - lastT);
@@ -742,6 +743,7 @@ const Engine = (() => {
       p.tl = []; p.wq = {}; p.sv = {}; p.qIn = {}; p.outcome = null; p.inPipe = false;
       p.d = {}; for (const s of P.stages) p.d[s.key] = dur(P, s.key, p.u[s.key]);
       p.unfit = p.cls === 'same' && p.uUnfit < P.unfit;
+      if (p.priorUnfit) { p.outcome = 'unfit'; continue; }
       p.noShow = p.uNoShow < P.noShow;
       p.arrive = Math.max(P.open, p.told + devFrom(P, p.uDev));
       if (p.noShow) { p.outcome = 'noshow'; continue; }
@@ -853,7 +855,7 @@ const Engine = (() => {
       unfit: pts.filter(p => p.outcome === 'unfit').length,
       deferred: pts.filter(p => p.outcome === 'deferred').length,
       noshow: pts.filter(p => p.outcome === 'noshow').length,
-      waitMean: mean(waits), waitP90: p90(waits),
+      waitMean: waits.length ? mean(waits) : null, waitP90: waits.length ? p90(waits) : null,
       chairWait: mean(treated.map(p => p.wq.chair || 0)),
       tis: mean(treated.map(p => p.leave - p.arrive)),
       idleChair: idleChairMin / 60, chairUtil: occChairMin / (P.chairs * openMin),
@@ -864,8 +866,8 @@ const Engine = (() => {
       decomp, setupMean, stUtil,
       waitPre: clsWait('pre'), waitSame: clsWait('same'),
       equity: [byL(0, 60), byL(60, 120), byL(120, 240), byL(240, 999)],
-      readyPre: mean(treated.filter(p => p.cls === 'pre').map(p => p.ready - p.arrive)),
-      readySame: mean(treated.filter(p => p.cls === 'same').map(p => p.ready - p.arrive)),
+      readyPre: (r => r.length ? mean(r) : null)(treated.filter(p => p.cls === 'pre').map(p => p.ready - p.arrive)),
+      readySame: (r => r.length ? mean(r) : null)(treated.filter(p => p.cls === 'same').map(p => p.ready - p.arrive)),
     };
     K.notTreated = K.unfit + K.deferred + K.noshow;
     K.cost = (P.wWait * (K.waitMean / 60)) + (P.wIdle * (K.idleChair / P.chairs)) + (P.wOT * (K.overtime / 60)) + P.wDef * K.deferred;
@@ -880,7 +882,7 @@ const Engine = (() => {
       const v = ks.map(k => k[f]).filter(x => x !== null && x !== undefined && !Number.isNaN(x));
       const m = v.reduce((a, b) => a + b, 0) / Math.max(1, v.length);
       const sd = Math.sqrt(v.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, v.length - 1));
-      S[f] = { m, hw: v.length > 1 ? 1.96 * sd / Math.sqrt(v.length) : 0 };
+      S[f] = { m, hw: v.length > 1 ? (1.96 + 2.4 / (v.length - 1) + 2.8 / (v.length - 1) ** 2) * sd / Math.sqrt(v.length) : 0 };
     }
     S.otDays = ks.filter(k => k.overtime > 0).length / Math.max(1, ks.length);
     S.days = ks.length;
@@ -913,7 +915,7 @@ let P = E.defaultParams();
 let seed = 7;
 const PRESETS = {
   base: {},
-  feasible: { fill: 0.6 },
+  feasible: { fill: 0.8, nurses: 6 },
   sanity: { rule: 'at8_fcfs', preCleared: 0 },
   kochi3: { preCleared: 0.6, precompound: true, templateOrder: 'lpt', rule: 'buffer' },
   tmh: { chairs: 75, nurses: 18, close: 1200, stageCaps: { reg: 8, blood: 10, doc: 12, pharm: 10 } },
@@ -954,7 +956,7 @@ function buildStageTable() {
   const t = $('stage-tbl');
   t.innerHTML = '<tr><th>Step</th><th>Low</th><th>Mode</th><th>High</th><th title="Servers; 0 = no queue">Cap</th></tr>' + P.stages.map((s, i) =>
     `<tr><td title="${s.src}">${s.step}. ${s.name}</td>` + ['lo', 'mode', 'hi'].map(f => `<td><input type="number" id="st-${s.key}-${f}" data-i="${i}" data-f="${f}" value="${s[f]}" min="0" step="1" aria-label="${s.name} ${f}"></td>`).join('') +
-    `<td>${s.cap === null ? '<span class="hint" title="Uses a nurse">RN</span>' : `<input type="number" id="st-${s.key}-cap" data-i="${i}" data-f="cap" value="${s.cap === Infinity ? 0 : s.cap}" min="0" step="1" aria-label="${s.name} capacity">`}</td></tr>`).join('');
+    `<td>${s.cap === null ? '<span class="hint" title="Uses a nurse">RN</span>' : (s.key === 'lab' || s.key === 'bill') ? '<span class="hint" title="A delay the unit does not control; never queues">—</span>' : `<input type="number" id="st-${s.key}-cap" data-i="${i}" data-f="cap" value="${s.cap === Infinity ? 0 : s.cap}" min="0" step="1" aria-label="${s.name} capacity">`}</td></tr>`).join('');
 }
 function buildMixTable() {
   const t = $('mix-tbl');
@@ -1091,7 +1093,7 @@ function renderBottleneck() {
   const starveShare = K.starve / capH;
   if (starveShare >= 0.2 && (top.q < 25 || starveShare > 0.3)) {
     head = 'Ready time is the binding constraint';
-    body = `Chairs sat idle for ${K.starve.toFixed(0)} chair-hours (${Math.round(starveShare * 100)}% of capacity) while patients were still in steps 1–6. Same-day patients reach a chair ${fmtHM(K.readySame || 0)} after arriving; pre-cleared patients ${fmtHM(K.readyPre || 0)}.`;
+    body = `Chairs sat idle for ${K.starve.toFixed(0)} chair-hours (${Math.round(starveShare * 100)}% of capacity) while patients were still in steps 1–6. ${K.readySame !== null ? `Same-day patients are ready ${fmtHM(K.readySame)} after arriving` : 'No same-day patients today'}${K.readyPre !== null ? `; pre-cleared patients ${fmtHM(K.readyPre)}` : ''}.`;
   } else if (top.k === 'chair') {
     const nurseCause = K.nurseBound > 0.25 * K.idleChair || K.nurseSat > 2;
     head = nurseCause ? 'Nurses are the binding constraint' : 'Chairs are the binding constraint';
@@ -1401,7 +1403,7 @@ function draw() {
   snap = false;
   // live counters
   const idle = P.chairs - inChair.size;
-  liveSet({ 'Clock': fmtT(Math.max(T, 0)), 'Arrived': `${arrived}/${R.K.n - R.K.noshow}`, 'In steps 1–6': preChair, 'Ready, no chair': inZone.chairq.length, 'In chairs': `${inChair.size}/${P.chairs}`, 'Idle chairs': idle, 'Nurse load': Math.round(load * 100) + '%', 'Treated': done.length, 'Sent home': home.length });
+  liveSet({ 'Clock': fmtT(Math.max(T, 0)), 'Arrived': `${arrived}/${R.K.n - R.K.noshow - R.pts.filter(p => p.priorUnfit).length}`, 'In steps 1–6': preChair, 'Ready, no chair': inZone.chairq.length, 'In chairs': `${inChair.size}/${P.chairs}`, 'Idle chairs': idle, 'Nurse load': Math.round(load * 100) + '%', 'Treated': done.length, 'Sent home': home.length });
 }
 let liveCache = '';
 function liveSet(o) { const h = Object.entries(o).filter(([k]) => k !== 'Clock').map(([k, v]) => `<div><small>${k}</small><b>${v}</b></div>`).join(''); if (h !== liveCache) { $('live').innerHTML = h; liveCache = h; } $('clock').textContent = o.Clock; }
@@ -1454,9 +1456,9 @@ async function runExp(which) {
     if (w === 'e5') {
       for (let q = 0.5; q <= 0.951; q += 0.05) J('e5q', +q.toFixed(2), { rule: 'buffer', q: +q.toFixed(2) });
       J('e5c', 'As is', {});
-      J('e5c', '+1 chair', { chairs: base.chairs + 1 }); J('e5c', '+1 nurse', { nurses: base.nurses + 1 });
+      J('e5c', '+1 chair', { chairs: base.chairs + 1, fill: base.fill * base.chairs / (base.chairs + 1) }); J('e5c', '+1 nurse', { nurses: base.nurses + 1 });
       for (const [k, n] of [['reg', 'registration clerk'], ['blood', 'phlebotomist'], ['doc', 'doctor'], ['pharm', 'pharmacy cabinet']]) J('e5c', '+1 ' + n, {}, p => { const s = p.stages.find(s => s.key === k); if (s.cap !== Infinity) s.cap += 1; });
-      J('e5c', 'Lab 30 min faster', {}, p => { const s = p.stages.find(s => s.key === 'lab'); s.lo -= 30; s.mode -= 30; s.hi -= 30; });
+      J('e5c', 'Lab 30 min faster', {}, p => { const s = p.stages.find(s => s.key === 'lab'); s.lo = Math.max(0, s.lo - 30); s.mode = Math.max(s.lo, s.mode - 30); s.hi = Math.max(s.mode, s.hi - 30); });
       J('e5c', 'Billing 15 min faster', {}, p => { const s = p.stages.find(s => s.key === 'bill'); s.lo = Math.max(5, s.lo - 15); s.mode = Math.max(5, s.mode - 15); s.hi = Math.max(5, s.hi - 15); });
       J('e5c', '+10% pre-cleared', { preCleared: Math.min(1, base.preCleared + 0.1) });
     }
